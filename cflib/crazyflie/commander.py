@@ -43,6 +43,7 @@ TYPE_ZDISTANCE = 2
 TYPE_HOVER = 5
 TYPE_FULL_STATE = 6
 TYPE_POSITION = 7
+TYPE_CUSTOMIZED = 8
 
 TYPE_META_COMMAND_NOTIFY_SETPOINT_STOP = 0
 
@@ -203,4 +204,16 @@ class Commander():
         pk.channel = SET_SETPOINT_CHANNEL
         pk.data = struct.pack('<Bffff', TYPE_POSITION,
                               x, y, z, yaw)
+        self._cf.send_packet(pk)
+
+    # def send_cus(self,vx,vy,vz,yawrate,yaw,groundmode,reset):
+    #     pk = CRTPPacket()
+    #     pk.port = CRTPPort.COMMANDER_GENERIC
+    #     pk.data = struct.pack('<Bfffff??', TYPE_CUSTOMIZED, float(vx), float(vy), float(vz), float(yawrate), float(yaw), groundmode.value, reset.value)
+    #     self._cf.send_packet(pk)
+
+    def send_cus(self,rolld, pitchd, yawd, yawrated, thrustd, start, reset):
+        pk = CRTPPacket()
+        pk.port = CRTPPort.COMMANDER_GENERIC
+        pk.data = struct.pack('<Bfffff??', TYPE_CUSTOMIZED, float(rolld), float(pitchd), float(yawd), float(yawrated), float(thrustd), start.value, reset.value)
         self._cf.send_packet(pk)
