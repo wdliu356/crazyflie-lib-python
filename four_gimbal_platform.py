@@ -90,7 +90,7 @@ class CombinedFrame:
 
 	# 	self.stop()
 
-	def run(self, stop_shared, att_ref_shared, yaw_rate_shared,reached,start,state_fb_shared):
+	def run(self, stop_shared, att_ref_shared, yaw_rate_shared,reached,start,state_fb_shared,thrust_shared):
 
 		# Initialize the low-level drivers (don't list the debug drivers)
 		cflib.crtp.init_drivers(enable_debug_driver=False)
@@ -118,6 +118,7 @@ class CombinedFrame:
 				self.qc.rolld = att_ref_shared[0]
 				self.qc.pitchd = att_ref_shared[1]
 				self.qc.yawd = att_ref_shared[2]
+				self.qc.thrustd = thrust_shared.value
 				# self.qc.yaw = yaw_ref_shared[0]
 				self.qc.yawrate = yaw_rate_shared[0] 
 				self.qc.start = start
@@ -153,33 +154,61 @@ class Controller:
 		self.verr = np.array([0.0,0.0,0.0])
 		self.pKp = np.array([0.3,0.3,0.3])
 		self.pKi = np.array([0.01,0.01,0.01])
+		self.vKp = np.array([0.3,0.3,0.3])
+		self.vKi = np.array([0.01,0.01,0.01])
 		self.reached = False
+		self.groundmode = True
+		self.g = 9.81
+		self.z_factor = 0.8
+		self.m = 0.0864
 
 	def position_control(self, pos_ref_shared, pos_fb_shared, vel_fb_shared,  vel_ref_shared, reached):
 		self.perr += (np.array(pos_ref_shared) - np.array(pos_fb_shared)) * self.dt
 		for i in range(3):
 			if abs(self.perr[i]) > 0.5:
 				self.perr[i] = 0.5*np.sign(self.perr[i])
-		vel_ref_shared[:] = self.pKp * (np.array(pos_ref_shared) - np.array(pos_fb_shared)) + self.pKi * self.err
+		vel_ref_shared[:] = self.pKp * (np.array(pos_ref_shared) - np.array(pos_fb_shared)) + self.pKi * self.perr
 		if self.mode == 0:
 			if np.linalg.norm(np.array(pos_ref_shared) - np.array(pos_fb_shared)) < 0.01:
 				reached.value = True
 			else:
 				reached.value = False
 
-	def velocity_control(self, pos_ref_shared, pos_fb_shared, vel_fb_shared,  vel_ref_shared, reached):
-		vel_ref_shared[:] = pos_ref_shared
-		if np.linalg.norm(np.array(vel_ref_shared) - np.array(vel_fb_shared)) < 0.1:
-			reached.value = True
+	def velocity_control(self, vel_fb_shared,  vel_ref_shared, att_ref_shared, thrust_shared, reached):
+		self.verr += (np.array(vel_ref_shared) - np.array(vel_fb_shared)) * self.dt
+		yawd = att_ref_shared[2]
+		for i in range(3):
+			if abs(self.verr[i]) > 0.5:
+				self.verr[i] = 0.5*np.sign(self.verr[i])
+		u = self.vKp * (np.array(vel_ref_shared) - np.array(vel_fb_shared)) + self.vKi * self.verr
+		a = np.sin(yawd)
+		b = np.cos(yawd)
+		if self.groundmode:
+			pitch_d = np.arctan(-(b*u[0]+a*u[1])/(self.g)/self.z_factor)
+			roll_d = np.arctan(-np.cos(pitch_d)*(a*u[0]-b*u[1])/(self.g)/self.z_factor)
+			thrust_d = (self.g)/np.cos(roll_d)/np.cos(pitch_d)*self.m*self.z_factor
 		else:
-			reached.value = False
+			pitch_d = np.arctan(-(b*u[0]+a*u[1])/(self.g-u[2]))
+			roll_d = np.arctan(-np.cos(pitch_d)*(a*u[0]-b*u[1])/(self.g-u[2]))
+			thrust_d = (self.g-u[2])/np.cos(roll_d)/np.cos(pitch_d)*self.m
+		thrust_shared.value = thrust_d
+		att_ref_shared[:] = [roll_d, pitch_d, yawd]
+		if self.mode == 1:
+			if np.linalg.norm(np.array(vel_ref_shared) - np.array(vel_fb_shared)) < 0.01:
+				reached.value = True
+			else:
+				reached.value = False
 
-	def run(self, pos_ref_shared, pos_fb_shared, vel_fb_shared,  vel_ref_shared, reached, stop_shared):
+	def run(self, pos_ref_shared, pos_fb_shared, vel_fb_shared,  vel_ref_shared, att_ref_shared, thrust_shared, reached, stop_shared, groundmode, mode):
 		while 1:
+			self.mode = mode.value
+			self.groundmode = groundmode.value
 			if stop_shared.value == 1:
 				break
 			self.current_time = time.time()
 			if self.current_time - self.last_loop_time > self.dt:
+				self.position_control(pos_ref_shared, pos_fb_shared, vel_fb_shared,  vel_ref_shared, reached)
+				self.velocity_control(vel_fb_shared,  vel_ref_shared, att_ref_shared, thrust_shared, reached)
 				# self.err += (np.array(pos_ref_shared) - np.array(pos_fb_shared)) * self.dt
 				# vel_ref_shared[:] = self.Kp * (np.array(pos_ref_shared) - np.array(pos_fb_shared)) + self.Ki * self.err
 				# self.last_loop_time = self.current_time
@@ -188,11 +217,11 @@ class Controller:
 				# else:
 				# 	reached.value = 0
 
-				vel_ref_shared[:] = [0,0,0]
-				if np.linalg.norm(np.array(vel_ref_shared) - np.array(vel_fb_shared)) < 0.1:
-					reached.value = True
-				else:
-					reached.value = False
+				# vel_ref_shared[:] = [0,0,0]
+				# if np.linalg.norm(np.array(vel_ref_shared) - np.array(vel_fb_shared)) < 0.1:
+				# 	reached.value = True
+				# else:
+				# 	reached.value = False
 			else:
 				time.sleep(0.001)
 
@@ -213,28 +242,27 @@ class Master:
 		self.pos_ref_shared = multiprocessing.Array('f',3)
 		self.pos_fb_shared = multiprocessing.Array('f',3)
 		self.vel_fb_shared = multiprocessing.Array('f',3)
-		# self.vel_shared = multiprocessing.Array('f',3)
-		# self.quat_shared = multiprocessing.Array('f',4)
-		# self.omega_shared = multiprocessing.Array('f',3)
-		# self.quat_shared[:] = [1,0,0,0]
-		# self.alpha_shared = multiprocessing.Array('f',4)
-		# self.beta_shared = multiprocessing.Array('f',4)
-		# self.thrust_shared = multiprocessing.Array('f',4)
-		# self.debug1_shared = multiprocessing.Array('f',15) # control
-		# self.debug2_shared = multiprocessing.Array('f',16) # combinedframe
 		self.stop_shared = multiprocessing.Value('i',0)
-
-		self.keyboard = KeyboardControl(control_mode='attitude')
+		self.thrust_shared = multiprocessing.Value('f',0)
+		self.att_ref_shared = multiprocessing.Array('f',3)
+		self.start = multiprocessing.Value('i',0)
+		self.start.value = False
+		self.mode = multiprocessing.Value('i',0)
+		self.mode.value = 0
+		self.keyboard = KeyboardControl(mode = 0,ground_mode=True)
+		
 		self.logger = CombinedLogger(folder_name='log_test_0801')
 
 		self.controller = Controller()
 		self.p_control = multiprocessing.Process(target=self.controller.run, 
-												args=(self.pos_ref_shared,self.pos_fb_shared, self.vel_fb_shared, self.vel_ref_shared, self.reached, self.stop_shared))
+												args=(self.pos_ref_shared, self.pos_fb_shared, self.vel_fb_shared,  self.vel_ref_shared, self.att_ref_shared, self.thrust_shared, self.reached, self.stop_shared, self.groundmode, self.mode))
 		self.cbframe = CombinedFrame()
 		self.p_cbframe = multiprocessing.Process(target=self.cbframe.run, 
-												args=(self.stop_shared, self.vel_ref_shared, self.yaw_ref_shared, self.yaw_rate_shared, self.reached, self.groundmode, self.state_fb_shared))
+												args=(self.stop_shared, self.att_ref_shared, self.yaw_rate_shared, self.reached, self.start, self.state_fb_shared,self.thrust_shared))
 
-		# self.op = Vicon()
+		self.op = Vicon()
+		self.init_position = self.op.position
+		self.init_pose = self.op.rotation
 		time.sleep(0.25)
 		
 	def run(self):
@@ -247,15 +275,23 @@ class Master:
 				break
 			current_time = time.time()
 			if current_time - self.last_loop_time > 0.005:
-				# self.pos_fb_shared[:] = self.op.position
-				self.pos_fb_shared[:] = [0.0,0.0,0.0]
+				self.pos_fb_shared[:] = self.op.position-self.init_position
+				self.vel_fb_shared[:] = self.op.velocity
+				# self.pos_fb_shared[:] = [0.0,0.0,0.0]
 				self.keyboard.command.update()
+				self.start.value = self.keyboard.start
+				self.mode.value = self.keyboard.mode
+				self.groundmode.value = self.keyboard.ground_mode
+				# self.controller.mode = self.keyboard.mode
+				# self.controller.groundmode = self.keyboard.ground_mode
 				self.stop_shared.value = self.keyboard.stop
 				self.pos_ref_shared[:] = self.keyboard.pos
-				self.yaw_ref_shared = self.keyboard.rpy[2]
-				self.vel_ref_shared[:] = self.keyboard.vel
-				self.yaw_rate_shared = self.keyboard.agv[2]
-				self.vel_fb_shared[:] = self.state_fb_shared[0:3]
+				# self.att_ref_shared[:] = self.keyboard.rpy
+				self.att_ref_shared[2] = self.keyboard.rpy[2] #update yaw
+				if self.controller.mode == 1:
+					self.vel_ref_shared[:] = self.keyboard.vel
+					self.yaw_rate_shared = self.keyboard.agv[2]
+				# self.vel_fb_shared[:] = self.state_fb_shared[0:3]
 				self.logger.log_append(int(round((current_time-self.start_time) * 1000)), int(round((current_time-self.last_loop_time) * 1000)),
 									   self.pos_fb_shared[:], 
 									   self.state_fb_shared[0:3], self.state_fb_shared[6:9], self.state_fb_shared[3:6],
