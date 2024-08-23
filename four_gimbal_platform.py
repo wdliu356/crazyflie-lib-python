@@ -154,10 +154,10 @@ class Controller:
 		self.dt = 0.01
 		self.perr = np.array([0.0,0.0,0.0])
 		self.verr = np.array([0.0,0.0,0.0])
-		self.pKp = np.array([0.3,-0.3,-0.3])# minus sign on y and z because of the coordinate system
+		self.pKp = np.array([0.3,-0.3,-1.5])# minus sign on y and z because of the coordinate system
 		self.pKi = np.array([0.01,-0.01,-0.01])# minus sign on y and z because of the coordinate system
-		self.vKp = np.array([3.5,3.5,5.0])
-		self.vKi = np.array([0.3,0.3,0.3])
+		self.vKp = np.array([3.5,3.5,10.0])
+		self.vKi = np.array([0.3,0.3,0.5])
 		self.reached = False
 		self.groundmode = True
 		self.g = 9.81
