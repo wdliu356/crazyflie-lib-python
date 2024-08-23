@@ -113,8 +113,10 @@ class KeyboardControl():
 				print("change mode to position")
 		if key_press == 't':
 			if self.ground_mode:
+				print("change mode to aerial mode")
 				self.ground_mode = False
 			else:
+				print("change mode to ground mode")
 				self.ground_mode = True
 		if key_press == 'escape':
 			self.stop = 1

@@ -66,8 +66,8 @@ class  SingleCF:
 	def _disconnected(self, link_uri):
 		print('Disconnected from %s' % link_uri)
 
-	def _update_motors(self):
-		self._cf.commander.send_cus(self.vx,self.vy,self.vz,self.yawrate,self.yaw,self.groundmode,self.reset)
+	def _update_motors(self,rolld,pitchd,yawd,yawrate,thrustd,start,reset):
+		self._cf.commander.send_cus(rolld,pitchd,yawd,yawrate,thrustd,start,reset)
 
 	def _stop_crazyflie(self):
 		self._cf.commander.send_stop_setpoint()
@@ -84,23 +84,24 @@ if __name__ == '__main__':
 	for i in available:
 		print(i[0])
 	time.sleep(0.25)
-	keyboard = KeyboardControl(control_mode='attitude')
+	keyboard = KeyboardControl()
 	qc = SingleCF('radio://0/80/2M/E7E7E7E7E7', 0)
 	time.sleep(0.25)
-	qc._cf.param.set_value('motorPowerSet.enable', '1')
-	for i in range(50):
+	# qc._cf.param.set_value('motorPowerSet.enable', '1')
+	for i in range(10):
 		# print(i)
 		keyboard.command.update()
-		if keyboard.stop == True:
+		if keyboard.stop == 1:
 			break
-		pwm = int(65535/50*(i+1))
-		print(pwm)
+		thrustd = 0.0864*9.81*(i+4)/10
+		qc._update_motors(0,0,0,0,thrustd,1,0)
 		# qc._cf.param.set_value('motorPowerSet.m1', str(pwm))
 		# qc._cf.param.set_value('motorPowerSet.m2', str(pwm))
 		# qc._cf.param.set_value('motorPowerSet.m3', str(pwm))
-		qc._cf.param.set_value('motorPowerSet.m4', str(pwm))
+		# qc._cf.param.set_value('motorPowerSet.m4', str(pwm))
 		time.sleep(1)
 	# qc._cf.param.set_value('motorPowerSet.m1', '0')
 	# qc._cf.param.set_value('motorPowerSet.m2', '0')
 	# qc._cf.param.set_value('motorPowerSet.m3', '0')
-	qc._cf.param.set_value('motorPowerSet.m4', '0')
+	# qc._cf.param.set_value('motorPowerSet.m4', '0')
+	qc._update_motors(0,0,0,0,0,0,0)

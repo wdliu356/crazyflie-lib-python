@@ -86,8 +86,8 @@ class TcpServer(object):
 class Vicon(object):
     def __init__(self):
         self.t1 = None
-        self.server = TcpServer("192.168.10.11", port=8800)
-
+        self.server = TcpServer("192.168.10.12", port=8800)
+        # self.server = TcpServer("10.1.120.10", port=8800)
         self.position = np.zeros(3)
         self.rotation = np.zeros(4)
         self.rpy = np.zeros(3)
@@ -109,8 +109,9 @@ class Vicon(object):
             self.position = data[0:3]
             self.velocity = data[3:6]
 
-            self.rotation_rate = data[6:9]
-            self.rotation = data[9:]
+            self.rpy = data[6:9]
+            self.rotation = data[9:13]
+            # self.rpy = data[13:]
             current_time = time.time()
             # print(current_time - previous_time)
             #print(self.position)
@@ -130,6 +131,8 @@ if __name__ == "__main__":
         print(vicon.rotation)
         print("==== vel ====")
         print(vicon.velocity)
+        print("==== rpy ====")
+        print(vicon.rpy)
 
     #     print("==== angular vel ====")
     #     print(vicon.rotation_rate)

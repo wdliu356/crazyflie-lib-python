@@ -76,19 +76,25 @@ class  SingleCF:
 		self.thrust3 = 0
 		self.thrust4 = 0
 
-		self.gain_name = ['vxKp', 'vxKi', 'vyKp', 'vyKi','vzKp','vzKi','zFactor',
+		# self.gain_name = ['vxKp', 'vxKi', 'vyKp', 'vyKi','vzKp','vzKi','zFactor',
+		self.gain_name = [
 					'roll_kp','roll_ki','roll_kd','pitch_kp','pitch_ki','pitch_kd',
 					'yaw_kp','yaw_ki','yaw_kd','mass','Ixx','Iyy','Izz','armLength']
 		# self.gain_value = [3.5,0.001,3.5,0.001,10,20,0.6,
 		# 			 0.5,-10.0,-225,0.6,10.0,300,
 		# 			 0.04,0.1,2.0,0.0864,2.0011E-06,6.9007E-06,0.0001064235,0.041]
-		self.gain_value = [3.5,0.1,3.5,0.1,10,20,0.8,
-					 0.35,1.0,-245.0,0.8,30.0,-600.0,
-					 0.015,0.02,-10.0,0.0864,2.0011E-06,6.9007E-06,0.0001064235,0.041]
+		# self.gain_value = [3.5,0.1,3.5,0.1,10,20,0.8,
+		self.gain_value = [
+					 0.4,1.0,-300.0,0.5,1.0,-550.0,
+					 0.1,0.02,-10.0,0.0864,2.0011E-06,6.9007E-06,0.0001064235,0.041]
+		print("start setting param")
 		for n in self.gain_name:
+			print(n)
 			ind = self.gain_name.index(n)
 			self._cf.param.set_value('customizedPid.{}'.format(n), '{}'.format(self.gain_value[ind]))
 		self._cf.param.set_value('stabilizer.controller', '6')
+		print("finished setting param")
+		
 		
 		
 
@@ -117,7 +123,7 @@ class  SingleCF:
 		self._lg_stabilizer.add_variable('stabilizer.roll', 'float')
 		self._lg_stabilizer.add_variable('stabilizer.pitch', 'float')
 		self._lg_stabilizer.add_variable('stabilizer.yaw', 'float')
-		# self._lg_state.add_variable('customizedCtl.thrust', 'float')
+		self._lg_estimate.add_variable('stabilizer.thrust', 'float')
 		self._lg_stabilizer.add_variable('gyro.x', 'float')
 		self._lg_stabilizer.add_variable('gyro.y', 'float')
 		self._lg_stabilizer.add_variable('gyro.z', 'float')
@@ -128,6 +134,7 @@ class  SingleCF:
 		self._lg_state.add_variable('customizedCtl.rollTorque', 'float')
 		self._lg_state.add_variable('customizedCtl.pitchTorque', 'float')
 		self._lg_state.add_variable('customizedCtl.yawTorque', 'float')
+		
 		self._lg_state.add_variable('customizedCtl.rollD', 'float')
 		self._lg_state.add_variable('customizedCtl.pitchD', 'float')
 		self._lg_state.add_variable('customizedCtl.yawD', 'float')
@@ -242,7 +249,7 @@ class  SingleCF:
 		self.roll = data["stabilizer.roll"]/180*np.pi
 		self.pitch = data["stabilizer.pitch"]/180*np.pi
 		self.yawfb = data["stabilizer.yaw"]/180*np.pi
-		print('the feedback yaw angle is %s' % self.yawfb)
+		# print('the feedback yaw angle is %s' % self.yawfb)
 		self.rollratefb = data["gyro.x"]/180*np.pi
 		self.pitchratefb = data["gyro.y"]/180*np.pi
 		self.yawratefb = data["gyro.z"]/180*np.pi
@@ -252,6 +259,7 @@ class  SingleCF:
 		self.vxfb = data["stateEstimate.vx"]
 		self.vyfb = data["stateEstimate.vy"]
 		self.vzfb = data["stateEstimate.vz"]
+		self.thrust = data["stabilizer.thrust"]
 		# print('the estimator type is %s' % data["stabilizer.estimator"])
 		# self.m1req = data["motor.m1req"]
 		# self.m2req = data["motor.m2req"]

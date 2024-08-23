@@ -114,6 +114,7 @@ class CombinedFrame:
 				print('stop')
 				break
 			self.current_time = time.time()
+			# print(self.current_time)
 			if self.current_time - self.last_loop_time > self.update_rate:
 				self.qc.rolld = att_ref_shared[0]
 				self.qc.pitchd = att_ref_shared[1]
@@ -121,8 +122,9 @@ class CombinedFrame:
 				self.qc.thrustd = thrust_shared.value
 				# self.qc.yaw = yaw_ref_shared[0]
 				self.qc.yawrate = yaw_rate_shared[0] 
-				self.qc.start = start
-				self.qc.reset = reached
+				self.qc.start = start.value
+				# print('in cbframe',self.qc.start.value)
+				self.qc.reset = reached.value
 				self.qc._update_motors()
 				self.dt = self.current_time - self.last_loop_time
 				self.last_loop_time = self.current_time
@@ -152,14 +154,14 @@ class Controller:
 		self.dt = 0.01
 		self.perr = np.array([0.0,0.0,0.0])
 		self.verr = np.array([0.0,0.0,0.0])
-		self.pKp = np.array([0.3,0.3,0.3])
-		self.pKi = np.array([0.01,0.01,0.01])
-		self.vKp = np.array([0.3,0.3,0.3])
-		self.vKi = np.array([0.01,0.01,0.01])
+		self.pKp = np.array([0.3,-0.3,-0.3])# minus sign on y and z because of the coordinate system
+		self.pKi = np.array([0.01,-0.01,-0.01])# minus sign on y and z because of the coordinate system
+		self.vKp = np.array([3.5,3.5,5.0])
+		self.vKi = np.array([0.3,0.3,0.3])
 		self.reached = False
 		self.groundmode = True
 		self.g = 9.81
-		self.z_factor = 0.8
+		self.z_factor = 0.95
 		self.m = 0.0864
 
 	def position_control(self, pos_ref_shared, pos_fb_shared, vel_fb_shared,  vel_ref_shared, reached):
@@ -262,22 +264,29 @@ class Master:
 
 		self.op = Vicon()
 		self.init_position = self.op.position
-		self.init_pose = self.op.rotation
+		self.init_pose = np.array([self.op.rpy[0],-self.op.rpy[1],-self.op.rpy[2]])
+		self.rpy_vicon = np.array([self.op.rpy[0],-self.op.rpy[1],-self.op.rpy[2]])
 		time.sleep(0.25)
 		
 	def run(self):
 		self.start_time = time.time()
 		self.last_loop_time = self.start_time
 		print(self.start_time)
+		loop_num = 0
 		while 1:
+			loop_num+=1
+			# print('in master',self.start.value)
 			if self.keyboard.stop == 1:
 				self.stop_shared.value = 1
 				break
+			if loop_num < 100:
+				self.init_position = self.op.position
 			current_time = time.time()
 			if current_time - self.last_loop_time > 0.005:
 				self.pos_fb_shared[:] = self.op.position-self.init_position
-				self.vel_fb_shared[:] = self.op.velocity
+				self.vel_fb_shared[:] = np.array([self.op.velocity[0],-self.op.velocity[1],-self.op.velocity[2]])# minus sign on y and z because of the coordinate system
 				# self.pos_fb_shared[:] = [0.0,0.0,0.0]
+				self.rpy_vicon = np.array([self.op.rpy[0],-self.op.rpy[1],-self.op.rpy[2]])
 				self.keyboard.command.update()
 				self.start.value = self.keyboard.start
 				self.mode.value = self.keyboard.mode
@@ -294,9 +303,9 @@ class Master:
 				# self.vel_fb_shared[:] = self.state_fb_shared[0:3]
 				self.logger.log_append(int(round((current_time-self.start_time) * 1000)), int(round((current_time-self.last_loop_time) * 1000)),
 									   self.pos_fb_shared[:], 
-									   self.state_fb_shared[0:3], self.state_fb_shared[6:9], self.state_fb_shared[3:6],
-									   self.pos_ref_shared[:], self.state_fb_shared[10:13],
-									   self.vel_ref_shared[:], self.state_fb_shared[13:16],self.state_fb_shared[16:20],self.state_fb_shared[20:24],self.state_fb_shared[24:28],self.state_fb_shared[28:32],self.state_fb_shared[9])
+									   self.vel_fb_shared[:], self.state_fb_shared[6:9], self.state_fb_shared[3:6],
+									   self.pos_ref_shared[:], self.att_ref_shared[:],
+									   self.vel_ref_shared[:], self.state_fb_shared[13:16],self.state_fb_shared[16:20],self.state_fb_shared[20:24],self.state_fb_shared[24:28],self.state_fb_shared[28:32],self.thrust_shared.value,self.rpy_vicon)
 				self.last_loop_time = current_time
 			else:
 				time.sleep(0.0001)

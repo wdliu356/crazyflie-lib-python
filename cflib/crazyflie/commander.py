@@ -215,5 +215,5 @@ class Commander():
     def send_cus(self,rolld, pitchd, yawd, yawrated, thrustd, start, reset):
         pk = CRTPPacket()
         pk.port = CRTPPort.COMMANDER_GENERIC
-        pk.data = struct.pack('<Bfffff??', TYPE_CUSTOMIZED, float(rolld), float(pitchd), float(yawd), float(yawrated), float(thrustd), start.value, reset.value)
+        pk.data = struct.pack('<Bfffff??', TYPE_CUSTOMIZED, float(rolld), float(pitchd), float(yawd), float(yawrated), float(thrustd), start, reset)
         self._cf.send_packet(pk)

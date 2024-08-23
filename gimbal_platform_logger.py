@@ -26,7 +26,8 @@ class CombinedLogger:
 							"u0","u1","u2","u3",
 							"m0req", "m1req", "m2req", "m3req",
 							"thrust0", "thrust1", "thrust2", "thrust3",
-							"thrust_ref"
+							"thrust_ref",
+							"roll_vicon", "pitch_vicon", "yaw_vicon"
 							]] # error rotation integration
 
 	def log_append(self, timestamp, dt, 
@@ -34,7 +35,7 @@ class CombinedLogger:
 						 pos_ref, rpy_ref, vel_ref,torque,
 						 w,u,mreq,thrust,
 						#  u,w,qfb,
-						 thrust_ref):
+						 thrust_ref,rpy_vicon):
 		"""
 		timestamp = round(timestamp,3)
 		e = round(e,3)
@@ -53,7 +54,8 @@ class CombinedLogger:
 								u[0],u[1],u[2],u[3],
 								mreq[0],mreq[1],mreq[2],mreq[3],
 								thrust[0],thrust[1],thrust[2],thrust[3],
-								thrust_ref])
+								thrust_ref,
+								rpy_vicon[0],rpy_vicon[1],rpy_vicon[2]])
 
 	def conv(self, s):
 		try:
@@ -138,6 +140,9 @@ class CombinedLogger:
 		thrust2 = log_memory_array[:,i]; i+=1
 		thrust3 = log_memory_array[:,i]; i+=1
 		thrust_ref = log_memory_array[:,i]; i+=1
+		roll_vicon = log_memory_array[:,i]; i+=1
+		pitch_vicon = log_memory_array[:,i]; i+=1
+		yaw_vicon = log_memory_array[:,i]; i+=1
 		plt.subplot(5,2,1)
 		plt.plot(timestamp,vel_x,'r',timestamp,x_vel_ref,'r--',timestamp,vel_y,'g',timestamp,y_vel_ref,'g--',timestamp,vel_z, 'b',timestamp,z_vel_ref,'b--')
 		plt.legend(["x","x_ref","y","y_ref","z","z_ref"])
@@ -154,8 +159,8 @@ class CombinedLogger:
 		plt.legend(["x","x_ref","y","y_ref","z","z_ref"])
 		plt.grid(True)
 		plt.subplot(5,2,4)
-		plt.plot(timestamp,roll,'r',timestamp,roll_ref,'r--',timestamp,pitch,'g',timestamp,pitch_ref,'g--',timestamp,yaw, 'b',timestamp,yaw_ref,'b--')
-		plt.legend(["roll","roll_ref","pitch","pitch_ref","yaw","yaw_ref"])
+		plt.plot(timestamp,roll,'r',timestamp,roll_ref,'r--',timestamp,pitch,'g',timestamp,pitch_ref,'g--',timestamp,yaw, 'b',timestamp,yaw_ref,'b--',timestamp,roll_vicon,'r-.',timestamp,pitch_vicon,'g-.',timestamp,yaw_vicon,'b-.')
+		plt.legend(["roll","roll_ref","pitch","pitch_ref","yaw","yaw_ref","roll_vicon","pitch_vicon","yaw_vicon"])
 		plt.ylabel('rpy')
 		plt.grid(True)
 		plt.subplot(5,2,5)
