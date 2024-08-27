@@ -282,7 +282,7 @@ class  SingleCF:
 
 	def _update_motors(self):
 		# self._cf.commander.send_cus(self.vx,self.vy,self.vz,self.yawrate,self.yaw,self.groundmode,self.reset)
-		self._cf.commander.send_cus(self.rolld,self.pitchd,self.yawd,self.yawrate,self.thrustd,self.start,self.reset)
+		self._cf.commander.send_cus(self.rolld,self.pitchd,self.yawd,self.yawrate,self.thrustd,self.start,self.reset,self.groundmode)
 
 	def _stop_crazyflie(self):
 		self._cf.commander.send_stop_setpoint()

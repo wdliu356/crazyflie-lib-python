@@ -90,7 +90,7 @@ class CombinedFrame:
 
 	# 	self.stop()
 
-	def run(self, stop_shared, att_ref_shared, yaw_rate_shared,reached,start,state_fb_shared,thrust_shared):
+	def run(self, stop_shared, att_ref_shared, yaw_rate_shared,reached,start,state_fb_shared,thrust_shared,groundmode):
 
 		# Initialize the low-level drivers (don't list the debug drivers)
 		cflib.crtp.init_drivers(enable_debug_driver=False)
@@ -120,6 +120,7 @@ class CombinedFrame:
 				self.qc.pitchd = att_ref_shared[1]
 				self.qc.yawd = att_ref_shared[2]
 				self.qc.thrustd = thrust_shared.value
+				self.qc.groundmode = groundmode.value
 				# self.qc.yaw = yaw_ref_shared[0]
 				self.qc.yawrate = yaw_rate_shared[0] 
 				self.qc.start = start.value
@@ -260,7 +261,7 @@ class Master:
 												args=(self.pos_ref_shared, self.pos_fb_shared, self.vel_fb_shared,  self.vel_ref_shared, self.att_ref_shared, self.thrust_shared, self.reached, self.stop_shared, self.groundmode, self.mode))
 		self.cbframe = CombinedFrame()
 		self.p_cbframe = multiprocessing.Process(target=self.cbframe.run, 
-												args=(self.stop_shared, self.att_ref_shared, self.yaw_rate_shared, self.reached, self.start, self.state_fb_shared,self.thrust_shared))
+												args=(self.stop_shared, self.att_ref_shared, self.yaw_rate_shared, self.reached, self.start, self.state_fb_shared,self.thrust_shared,self.groundmode))
 
 		self.op = Vicon()
 		self.init_position = self.op.position
