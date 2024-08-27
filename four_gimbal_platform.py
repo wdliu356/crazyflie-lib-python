@@ -154,27 +154,36 @@ class Controller:
 		self.dt = 0.01
 		self.perr = np.array([0.0,0.0,0.0])
 		self.verr = np.array([0.0,0.0,0.0])
-		self.pKp = np.array([0.3,-0.3,-1.5])# minus sign on y and z because of the coordinate system
-		self.pKi = np.array([0.01,-0.01,-0.01])# minus sign on y and z because of the coordinate system
-		self.vKp = np.array([3.5,3.5,10.0])
+		self.pKp = np.array([0.6,-0.6,-1.5])# minus sign on y and z because of the coordinate system
+		self.pKi = np.array([0.01,-0.01,-0.1])# minus sign on y and z because of the coordinate system
+		self.pKd = np.array([0.6,0.6,0.6])
+		self.vKp = np.array([4.5,4.5,10.0])
 		self.vKi = np.array([0.3,0.3,0.5])
 		self.reached = False
 		self.groundmode = True
 		self.g = 9.81
-		self.z_factor = 0.95
+		self.z_factor = 0.7
 		self.m = 0.0864
+		self.roll_factor = 1.0
+		self.pitch_factor = 1.0
 
 	def position_control(self, pos_ref_shared, pos_fb_shared, vel_fb_shared,  vel_ref_shared, reached):
 		self.perr += (np.array(pos_ref_shared) - np.array(pos_fb_shared)) * self.dt
 		for i in range(3):
 			if abs(self.perr[i]) > 0.5:
 				self.perr[i] = 0.5*np.sign(self.perr[i])
-		vel_ref_shared[:] = self.pKp * (np.array(pos_ref_shared) - np.array(pos_fb_shared)) + self.pKi * self.perr
+		vel_ref_shared[:] = self.pKp * (np.array(pos_ref_shared) - np.array(pos_fb_shared)) + self.pKi * self.perr + self.pKd*vel_fb_shared
 		if self.mode == 0:
-			if np.linalg.norm(np.array(pos_ref_shared) - np.array(pos_fb_shared)) < 0.01:
+			if np.linalg.norm(np.array(pos_ref_shared) - np.array(pos_fb_shared)) < 0.01 and np.linalg.norm(vel_fb_shared) < 0.1:
 				reached.value = True
+				self.z_factor = 0.6
+				self.roll_factor = 1.0
+				self.pitch_factor = 1.0
 			else:
 				reached.value = False
+				self.z_factor = 0.9
+				self.roll_factor = 1.5
+				self.pitch_factor = 1.0
 
 	def velocity_control(self, vel_fb_shared,  vel_ref_shared, att_ref_shared, thrust_shared, reached):
 		self.verr += (np.array(vel_ref_shared) - np.array(vel_fb_shared)) * self.dt
@@ -186,13 +195,15 @@ class Controller:
 		a = np.sin(yawd)
 		b = np.cos(yawd)
 		if self.groundmode:
-			pitch_d = np.arctan(-(b*u[0]+a*u[1])/(self.g)/self.z_factor)
-			roll_d = np.arctan(-np.cos(pitch_d)*(a*u[0]-b*u[1])/(self.g)/self.z_factor)
+			pitch_d = self.pitch_factor*np.arctan(-(b*u[0]+a*u[1])/(self.g)/self.z_factor)
+			roll_d = self.roll_factor*np.arctan(-np.cos(pitch_d)*(a*u[0]-b*u[1])/(self.g)/self.z_factor)
 			thrust_d = (self.g)/np.cos(roll_d)/np.cos(pitch_d)*self.m*self.z_factor
 		else:
 			pitch_d = np.arctan(-(b*u[0]+a*u[1])/(self.g-u[2]))
 			roll_d = np.arctan(-np.cos(pitch_d)*(a*u[0]-b*u[1])/(self.g-u[2]))
 			thrust_d = (self.g-u[2])/np.cos(roll_d)/np.cos(pitch_d)*self.m
+			if thrust_d > 1.5*self.m*self.g:
+				thrust_d = 1.5*self.m*self.g
 		thrust_shared.value = thrust_d
 		att_ref_shared[:] = [roll_d, pitch_d, yawd]
 		if self.mode == 1:
@@ -253,7 +264,7 @@ class Master:
 		self.mode.value = 0
 		self.keyboard = KeyboardControl(mode = 0,ground_mode=True)
 		
-		self.logger = CombinedLogger(folder_name='log_test_0801')
+		self.logger = CombinedLogger(folder_name='log_test_0827')
 
 		self.controller = Controller()
 		self.p_control = multiprocessing.Process(target=self.controller.run, 
@@ -286,7 +297,7 @@ class Master:
 				self.pos_fb_shared[:] = self.op.position-self.init_position
 				self.vel_fb_shared[:] = np.array([self.op.velocity[0],-self.op.velocity[1],-self.op.velocity[2]])# minus sign on y and z because of the coordinate system
 				# self.pos_fb_shared[:] = [0.0,0.0,0.0]
-				self.rpy_vicon = np.array([self.op.rpy[0],-self.op.rpy[1],-self.op.rpy[2]])
+				self.rpy_vicon = np.array([self.op.rpy[0],-self.op.rpy[1],self.op.rpy[2]])
 				self.keyboard.command.update()
 				self.start.value = self.keyboard.start
 				self.mode.value = self.keyboard.mode
@@ -304,7 +315,7 @@ class Master:
 				self.logger.log_append(int(round((current_time-self.start_time) * 1000)), int(round((current_time-self.last_loop_time) * 1000)),
 									   self.pos_fb_shared[:], 
 									   self.vel_fb_shared[:], self.state_fb_shared[6:9], self.state_fb_shared[3:6],
-									   self.pos_ref_shared[:], self.att_ref_shared[:],
+									   self.pos_ref_shared[:],[self.att_ref_shared[0],self.att_ref_shared[1],-self.att_ref_shared[2]],
 									   self.vel_ref_shared[:], self.state_fb_shared[13:16],self.state_fb_shared[16:20],self.state_fb_shared[20:24],self.state_fb_shared[24:28],self.state_fb_shared[28:32],self.thrust_shared.value,self.rpy_vicon)
 				self.last_loop_time = current_time
 			else:
