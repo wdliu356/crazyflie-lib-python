@@ -78,18 +78,23 @@ class  SingleCF:
 
 		# self.gain_name = ['vxKp', 'vxKi', 'vyKp', 'vyKi','vzKp','vzKi','zFactor',
 		self.gain_name = [
-					'roll_kp','roll_ki','roll_kd','pitch_kp','pitch_ki','pitch_kd',
-					'yaw_kp','yaw_ki','yaw_kd','mass','Ixx','Iyy','Izz','armLength']
+					'roll_kp','roll_ki','roll_kd',
+					'pitch_kp','pitch_ki','pitch_kd',
+					'yaw_kp','yaw_ki','yaw_kd',
+					'mass','Ixx','Iyy','Izz','armLength']
 		# self.gain_value = [3.5,0.001,3.5,0.001,10,20,0.6,
 		# 			 0.5,-10.0,-225,0.6,10.0,300,
 		# 			 0.04,0.1,2.0,0.0864,2.0011E-06,6.9007E-06,0.0001064235,0.041]
 		# self.gain_value = [3.5,0.1,3.5,0.1,10,20,0.8,
+		
 		# self.gain_value = [
-		# 			 0.5,1.0,-550.0,0.5,1.0,-550.0,
-		# 			 0.1,0.02,-10.0,0.0864,2.0011E-06,6.9007E-06,0.0001064235,0.041]
+		# 			 0.8,0.3,-900.0,0.8,1.0,-850.0,0.03,0.02,-10.0,
+		# 			 0.0864,2.0011E-06,6.9007E-06,0.0001064235,0.041] # tune here
 		self.gain_value = [
-					 0.5,1.0,-550.0,0.8,1.0,-850.0,
-					 0.1,0.02,-10.0,0.0864,2.0011E-06,6.9007E-06,0.0001064235,0.041]
+					 0.8, 0.3, -1200.0,
+					 0.8, 1.0, -850.0,
+					 0.03, 0.02, -15.0,
+					 0.0864,2.0011E-06,6.9007E-06,0.0001064235,0.041] # tune here
 		print("start setting param")
 		for n in self.gain_name:
 			print(n)
@@ -217,8 +222,11 @@ class  SingleCF:
 
 	def _battery_log_data(self, timestamp, data, logconf):
 		battery_data = round(data['pm.vbat'], 1)
-		print('Battery voltage of |CF %s| is: |3.1V(E)| --- %s V --- |4.2V(F)|' % (self.index, battery_data))
-		self._lg_battery.data_received_cb.remove_callback(self._battery_log_data)
+		if battery_data < 3.7:
+			print('Battery voltage of |CF %s| is: |3.1V(E)| --- %s V --- |4.2V(F)|' % (self.index, battery_data))
+		# print('Battery voltage of |CF %s| is: |3.1V(E)| --- %s V --- |4.2V(F)|' % (self.index, battery_data))
+		# self._lg_battery.data_received_cb.remove_callback(self._battery_log_data)
+
 
 	def _stab_log_error(self, logconf, msg):
 		print('Error when logging %s: %s' % (logconf.name, msg))

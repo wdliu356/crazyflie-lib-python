@@ -155,11 +155,14 @@ class Controller:
 		self.dt = 0.01
 		self.perr = np.array([0.0,0.0,0.0])
 		self.verr = np.array([0.0,0.0,0.0])
-		self.pKp = np.array([0.6,-0.6,-1.5])# minus sign on y and z because of the coordinate system
-		self.pKi = np.array([0.01,-0.01,-0.1])# minus sign on y and z because of the coordinate system
-		self.pKd = np.array([0.6,0.6,0.6])
-		self.vKp = np.array([4.5,4.5,10.0])
-		self.vKi = np.array([0.3,0.3,0.5])
+		# self.pKp = np.array([0.6,-0.6,-1.5])# minus sign on y and z because of the coordinate system
+		# self.pKi = np.array([0.01,-0.01,-0.1])# minus sign on y and z because of the coordinate system
+		# self.pKd = np.array([0.6,0.6,0.1])
+		self.pKp = np.array([5.0,-5.0,-15.0])# minus sign on y and z because of the coordinate system
+		self.pKi = np.array([0.1,-0.1,-2.5])# minus sign on y and z because of the coordinate system
+		self.pKd = np.array([3.5,3.5,3.0])
+		# self.vKp = np.array([4.5,4.5,1.0])
+		# self.vKi = np.array([0.3,0.3,0.1])
 		self.reached = False
 		self.groundmode = True
 		self.g = 9.81
@@ -167,6 +170,86 @@ class Controller:
 		self.m = 0.0864
 		self.roll_factor = 1.0
 		self.pitch_factor = 1.0
+		self.num = 0
+		self.num_bad = 0 # TEST
+	
+	def acc_control(self, pos_ref_shared, pos_fb_shared, vel_fb_shared,  vel_ref_shared, reached, acc_ref_shared,att_ref_shared,att_fb):
+		# acc_ref_shared[:] = self.pKd*(np.array(vel_ref_shared) - np.array(vel_fb_shared))
+		if self.mode == 0: #tune here
+			if self.groundmode:
+				# self.pKp = np.array([4.5,-4.5,-15.0])
+				# self.pKi = np.array([0.2,-0.2,-2.5])
+				# self.pKd = np.array([3.5,3.5,3.0])
+
+				self.pKp = np.array([5.0,-5.0,-15.0])
+				self.pKi = np.array([0.15,-0.15,-2.5])
+				self.pKd = np.array([3.75,3.75,3.0])
+			else:
+				# self.pKp = np.array([3.5,-3.5,-10.0])
+				# self.pKi = np.array([0.3,-0.3,-6.5])
+				# self.pKd = np.array([4.5,4.5,5.0])
+
+				self.pKp = np.array([3.5,-3.5,-10.0])
+				self.pKi = np.array([0.3,-0.3,-6.5])
+				self.pKd = np.array([4.5,4.5,24.0])
+			self.perr += (np.array(pos_ref_shared) - np.array(pos_fb_shared)) * self.dt
+			for i in range(3):
+				if abs(self.perr[i]) > 0.5:
+					self.perr[i] = 0.5*np.sign(self.perr[i])
+			acc_ref_shared[:] = self.pKp * (np.array(pos_ref_shared) - np.array(pos_fb_shared)) + self.pKi * self.perr + self.pKd*(np.array(vel_ref_shared) - np.array(vel_fb_shared))
+			if self.groundmode:
+				# [0.01 0.05 0.01]
+				if np.linalg.norm(np.array(pos_ref_shared) - np.array(pos_fb_shared)) < 0.01 and np.linalg.norm(vel_fb_shared) < 0.05 and np.linalg.norm(att_ref_shared[2]-att_fb[2]) < 0.03:
+					self.num += 1
+					self.num_bad = 0
+					if self.num > 500: #### tune here 100
+						reached.value = True
+						self.z_factor = 0.6
+						# self.roll_factor = 1.0
+						# self.pitch_factor = 1.0
+					# reached.value = True
+					# self.num += 1
+					# if self.num > 100: #### tune here 100
+					# 	self.z_factor = 0.6
+					# 	# self.roll_factor = 1.0
+					# 	# self.pitch_factor = 1.0
+				else:
+					self.num_bad += 1
+					self.num = 0
+					if self.num_bad > 500: #### tune here 100
+						reached.value = False
+						self.z_factor = 0.9
+						self.roll_factor = 1.2
+						self.pitch_factor = 1.0
+					# reached.value = False
+					# self.num = 0
+					# self.z_factor = 0.9
+					
+		else:
+			acc_ref_shared[:] = self.pKd*(np.array(vel_ref_shared) - np.array(vel_fb_shared))
+			# if self.groundmode:
+			# 	if np.linalg.norm(np.array(vel_ref_shared) - np.array(vel_fb_shared)) < 0.01:
+			# 		reached.value = True
+			# 	else:
+			# 		reached.value = False
+
+	def target_setup(self,acc_ref_shared,att_ref_shared,thrust_shared):
+		yawd = att_ref_shared[2]
+		a = np.sin(yawd)
+		b = np.cos(yawd)
+		if self.groundmode:
+			pitch_d = self.pitch_factor*np.arctan(-(b*acc_ref_shared[0]+a*acc_ref_shared[1])/(self.g)/self.z_factor)
+			roll_d = self.roll_factor*np.arctan(-np.cos(pitch_d)*(a*acc_ref_shared[0]-b*acc_ref_shared[1])/(self.g)/self.z_factor)
+			thrust_d = (self.g)/np.cos(roll_d)/np.cos(pitch_d)*self.m*self.z_factor
+		else:
+			pitch_d = np.arctan(-(b*acc_ref_shared[0]+a*acc_ref_shared[1])/(self.g-acc_ref_shared[2]))
+			roll_d = np.arctan(-np.cos(pitch_d)*(a*acc_ref_shared[0]-b*acc_ref_shared[1])/(self.g-acc_ref_shared[2]))
+			thrust_d = (self.g-acc_ref_shared[2])/np.cos(roll_d)/np.cos(pitch_d)*self.m
+			if thrust_d > 1.5*self.m*self.g:
+				thrust_d = 1.5*self.m*self.g
+		thrust_shared.value = thrust_d
+		att_ref_shared[:] = [roll_d, pitch_d, yawd]
+
 
 	def position_control(self, pos_ref_shared, pos_fb_shared, vel_fb_shared,  vel_ref_shared, reached):
 		self.perr += (np.array(pos_ref_shared) - np.array(pos_fb_shared)) * self.dt
@@ -187,12 +270,15 @@ class Controller:
 				self.pitch_factor = 1.0
 
 	def velocity_control(self, vel_fb_shared,  vel_ref_shared, att_ref_shared, thrust_shared, reached):
-		self.verr += (np.array(vel_ref_shared) - np.array(vel_fb_shared)) * self.dt
+		# self.verr += (np.array(vel_ref_shared) - np.array(vel_fb_shared)) * self.dt
 		yawd = att_ref_shared[2]
-		for i in range(3):
-			if abs(self.verr[i]) > 0.5:
-				self.verr[i] = 0.5*np.sign(self.verr[i])
-		u = self.vKp * (np.array(vel_ref_shared) - np.array(vel_fb_shared)) + self.vKi * self.verr
+		# for i in range(3):
+		# 	if abs(self.verr[i]) > 0.5:
+		# 		self.verr[i] = 0.5*np.sign(self.verr[i])
+		# u = self.vKp * (np.array(vel_ref_shared) - np.array(vel_fb_shared)) + self.vKi * self.verr
+		# print("vel",vel_ref_shared[:])
+		# print('u',u)
+		u = vel_ref_shared[:]
 		a = np.sin(yawd)
 		b = np.cos(yawd)
 		if self.groundmode:
@@ -207,13 +293,13 @@ class Controller:
 				thrust_d = 1.5*self.m*self.g
 		thrust_shared.value = thrust_d
 		att_ref_shared[:] = [roll_d, pitch_d, yawd]
-		if self.mode == 1:
-			if np.linalg.norm(np.array(vel_ref_shared) - np.array(vel_fb_shared)) < 0.01:
-				reached.value = True
-			else:
-				reached.value = False
+		# if self.mode == 1:
+		# 	if np.linalg.norm(np.array(vel_ref_shared) - np.array(vel_fb_shared)) < 0.01:
+		# 		reached.value = True
+		# 	else:
+		# 		reached.value = False
 
-	def run(self, pos_ref_shared, pos_fb_shared, vel_fb_shared,  vel_ref_shared, att_ref_shared, thrust_shared, reached, stop_shared, groundmode, mode):
+	def run(self, pos_ref_shared, pos_fb_shared, vel_fb_shared,  vel_ref_shared, att_ref_shared, thrust_shared, reached, stop_shared, groundmode, mode, acc_ref_shared,att_fb):
 		while 1:
 			self.mode = mode.value
 			self.groundmode = groundmode.value
@@ -221,8 +307,11 @@ class Controller:
 				break
 			self.current_time = time.time()
 			if self.current_time - self.last_loop_time > self.dt:
-				self.position_control(pos_ref_shared, pos_fb_shared, vel_fb_shared,  vel_ref_shared, reached)
-				self.velocity_control(vel_fb_shared,  vel_ref_shared, att_ref_shared, thrust_shared, reached)
+				self.acc_control(pos_ref_shared, pos_fb_shared, vel_fb_shared,  vel_ref_shared, reached, acc_ref_shared,att_ref_shared,att_fb)
+				self.target_setup(acc_ref_shared,att_ref_shared,thrust_shared)
+				
+				# self.position_control(pos_ref_shared, pos_fb_shared, vel_fb_shared,  vel_ref_shared, reached)
+				# self.velocity_control(vel_fb_shared,  vel_ref_shared, att_ref_shared, thrust_shared, reached)
 				# self.err += (np.array(pos_ref_shared) - np.array(pos_fb_shared)) * self.dt
 				# vel_ref_shared[:] = self.Kp * (np.array(pos_ref_shared) - np.array(pos_fb_shared)) + self.Ki * self.err
 				# self.last_loop_time = self.current_time
@@ -246,6 +335,7 @@ class Controller:
 class Master:
 	def __init__(self):
 		self.start_time = 0
+		self.acc_ref_shared = multiprocessing.Array('f',3)
 		self.vel_ref_shared = multiprocessing.Array('f',3)
 		self.yaw_ref_shared = multiprocessing.Array('f',1)
 		self.yaw_rate_shared = multiprocessing.Array('f',1)
@@ -269,7 +359,7 @@ class Master:
 
 		self.controller = Controller()
 		self.p_control = multiprocessing.Process(target=self.controller.run, 
-												args=(self.pos_ref_shared, self.pos_fb_shared, self.vel_fb_shared,  self.vel_ref_shared, self.att_ref_shared, self.thrust_shared, self.reached, self.stop_shared, self.groundmode, self.mode))
+												args=(self.pos_ref_shared, self.pos_fb_shared, self.vel_fb_shared,  self.vel_ref_shared, self.att_ref_shared, self.thrust_shared, self.reached, self.stop_shared, self.groundmode, self.mode,self.acc_ref_shared,self.state_fb_shared[6:9]))
 		self.cbframe = CombinedFrame()
 		self.p_cbframe = multiprocessing.Process(target=self.cbframe.run, 
 												args=(self.stop_shared, self.att_ref_shared, self.yaw_rate_shared, self.reached, self.start, self.state_fb_shared,self.thrust_shared,self.groundmode))
@@ -298,7 +388,7 @@ class Master:
 				self.pos_fb_shared[:] = self.op.position-self.init_position
 				self.vel_fb_shared[:] = np.array([self.op.velocity[0],-self.op.velocity[1],-self.op.velocity[2]])# minus sign on y and z because of the coordinate system
 				# self.pos_fb_shared[:] = [0.0,0.0,0.0]
-				self.rpy_vicon = np.array([self.op.rpy[0],-self.op.rpy[1],self.op.rpy[2]])
+				self.rpy_vicon = np.array([self.op.rpy[0],self.op.rpy[1],self.op.rpy[2]])
 				self.keyboard.command.update()
 				self.start.value = self.keyboard.start
 				self.mode.value = self.keyboard.mode

@@ -29,6 +29,11 @@ class KeyboardControl():
 		self.rpy = [0.0,0.0,0] # roll pitch yaw
 		#self.rpy = [0.5, -0.6, 1]  # roll pitch yaw
 		self.agv = [0.0,0.0,0.0] # angular velocity
+		self.wp = []
+		self.wp_list = [[1.0,0.0,0.0,0.0],[1.0,1.0,0.0,0.0],[1.0,1.0,0.0,np.pi],[0.0,1.0,0.0,np.pi],[0.0,0.0,0.0,np.pi]]
+		self.wp_list1 =[[0.0,0.0,1.0,0.0],[1.0,0.0,1.0,0.0],[1.0,1.0,1.0,0.0],[0.0,1.0,1.0,0.0],[0.0,0.0,1.0,0.0],[0.0,0.0,0.0,0.0]] 
+		self.wp_list2 =[[1.0,0.0,0.0,0.0],[2.0,0.0,1.0,0.0],[3.0,0.0,0.0,0.0]]
+		self.wp_index = 0
 		self.start = True
 		self.angle_step = 0.1
 		self.pos_step = 0.05
@@ -73,6 +78,7 @@ class KeyboardControl():
 				self.pos[2] = self.pos[2]-0.1*self.z_step
 			elif key_press == 'alt_r':
 				self.pos[2] = self.pos[2]+0.1*self.z_step
+			
 		elif self.mode==1:
 			if key_press == 'w':
 				self.vel[0] -= self.pos_step
@@ -118,6 +124,26 @@ class KeyboardControl():
 			else:
 				print("change mode to ground mode")
 				self.ground_mode = True
+		if key_press == 'z':
+			self.wp = self.wp_list
+			self.pos = self.wp[0][0:3]
+			self.rpy[2] = self.wp[0][3]
+		elif key_press == 'x':
+			self.wp = self.wp_list1
+			self.pos = self.wp[0][0:3]
+			self.rpy[2] = self.wp[0][3]
+		elif key_press == 'c':
+			self.wp = self.wp_list2
+			self.pos = self.wp[0][0:3]
+			self.rpy[2] = self.wp[0][3]
+		elif key_press == 'enter':
+			self.wp_index += 1
+			if self.wp_index == len(self.wp):
+				self.wp_index = 0
+				print("waypoint finished")
+			else:
+				self.pos = self.wp[self.wp_index][0:3]
+				self.rpy[2] = self.wp[self.wp_index][3]
 		if key_press == 'escape':
 			self.stop = 1
 			self.start = False
