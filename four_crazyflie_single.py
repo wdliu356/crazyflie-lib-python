@@ -88,13 +88,15 @@ class  SingleCF:
 		# self.gain_value = [3.5,0.1,3.5,0.1,10,20,0.8,
 		
 		# self.gain_value = [
-		# 			 0.8,0.3,-900.0,0.8,1.0,-850.0,0.03,0.02,-10.0,
+		# 			 1.2, 0.05, -1500.0,
+		# 			 0.5, 0.0001, -550.0,
+		# 			 0.03, 0.02, -15.0,
 		# 			 0.0864,2.0011E-06,6.9007E-06,0.0001064235,0.041] # tune here
 		self.gain_value = [
-					 0.8, 0.3, -1200.0,
-					 0.8, 1.0, -850.0,
+					 1.2, 0.05, -1500.0,
+					 0.7, 0.000, -800.0,
 					 0.03, 0.02, -15.0,
-					 0.0864,2.0011E-06,6.9007E-06,0.0001064235,0.041] # tune here
+					 0.0754,2.0011E-06,6.9007E-06,0.0001064235,0.041] # tune here
 		print("start setting param")
 		for n in self.gain_name:
 			print(n)
@@ -296,4 +298,9 @@ class  SingleCF:
 		self._cf.commander.send_stop_setpoint()
 		# time.sleep(0.1)
 		self._cf.close_link()
+
+if __name__ == '__main__':
+	uri = 'radio://0/80/2M'
+	cf = SingleCF(uri, 1)
+	# time.sleep(5
 

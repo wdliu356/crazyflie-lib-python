@@ -29,19 +29,16 @@ class KeyboardControl():
 		self.rpy = [0.0,0.0,0] # roll pitch yaw
 		#self.rpy = [0.5, -0.6, 1]  # roll pitch yaw
 		self.agv = [0.0,0.0,0.0] # angular velocity
-		self.wp = []
-		self.wp_list = [[1.0,0.0,0.0,0.0],[1.0,1.0,0.0,0.0],[1.0,1.0,0.0,np.pi],[0.0,1.0,0.0,np.pi],[0.0,0.0,0.0,np.pi]]
-		self.wp_list1 =[[0.0,0.0,1.0,0.0],[1.0,0.0,1.0,0.0],[1.0,1.0,1.0,0.0],[0.0,1.0,1.0,0.0],[0.0,0.0,1.0,0.0],[0.0,0.0,0.0,0.0]] 
-		self.wp_list2 =[[1.0,0.0,0.0,0.0],[2.0,0.0,1.0,0.0],[3.0,0.0,0.0,0.0]]
 		self.wp_index = 0
 		self.start = True
 		self.angle_step = 0.1
 		self.pos_step = 0.05
 		self.z_step = 0.1
-
+		self.auto_mode = True
 		self.stop = 0
 		self.landing_overwrite = 0
 		self.ground_mode = ground_mode
+		self.loc_mode = False
 
 	def key_input(self, event):
 		key_press = event.keysym.lower()
@@ -68,8 +65,12 @@ class KeyboardControl():
 
 			elif key_press == 'q':
 				self.rpy[2] += self.angle_step
+				if self.rpy[2] > np.pi:
+					self.rpy[2] -= 2*np.pi
 			elif key_press == 'e':
 				self.rpy[2] -= self.angle_step
+				if self.rpy[2] < -np.pi:
+					self.rpy[2] += 2*np.pi
 			elif key_press == 'control_l':
 				self.pos[2] = self.pos[2]-self.z_step
 			elif key_press == 'alt_l':
@@ -124,26 +125,77 @@ class KeyboardControl():
 			else:
 				print("change mode to ground mode")
 				self.ground_mode = True
-		if key_press == 'z':
-			self.wp = self.wp_list
-			self.pos = self.wp[0][0:3]
-			self.rpy[2] = self.wp[0][3]
-		elif key_press == 'x':
-			self.wp = self.wp_list1
-			self.pos = self.wp[0][0:3]
-			self.rpy[2] = self.wp[0][3]
-		elif key_press == 'c':
-			self.wp = self.wp_list2
-			self.pos = self.wp[0][0:3]
-			self.rpy[2] = self.wp[0][3]
-		elif key_press == 'enter':
-			self.wp_index += 1
-			if self.wp_index == len(self.wp):
-				self.wp_index = 0
-				print("waypoint finished")
+		if key_press == 'z':### along the trajectory
+			for i in range(10000):
+				x = 2*np.pi/10000*i
+				self.pos[0] = np.sin(2*x)
+				self.pos[1] = 2*(1-np.cos(x))
+				self.pos[2] = 0
+				self.rpy[2] = np.arctan2(2*(1-np.cos(2*np.pi/10000*(i+1)))-2*(1-np.cos(x)),np.sin(2*2*np.pi/10000*(i+1))-np.sin(2*x))
+				if key_press == 'escape':
+					break
+				time.sleep(0.005)
+
+		elif key_press == 'x':### constant yaw rate
+			for i in range(10000):
+				x = 2*np.pi/10000*i
+				self.pos[0] = np.sin(2*x)
+				self.pos[1] = 2*(1-np.cos(x))
+				self.pos[2] = 0
+				self.agv[2] = 0.2
+				if key_press == 'escape':
+					break
+				time.sleep(0.005)
+
+		elif key_press == 'c':### constant yaw angle
+			for i in range(10000):
+				x = 2*np.pi/10000*i
+				self.pos[0] = np.sin(2*x)
+				self.pos[1] = 2*(1-np.cos(x))
+				self.pos[2] = 0
+				self.rpy[2] = 0
+				if key_press == 'escape':
+					break
+				time.sleep(0.005)
+
+		elif key_press == 'v':### changing alttitude
+			for i in range(10000):
+				x = 2*np.pi/10000*i
+				self.pos[0] = np.sin(2*x)
+				self.pos[1] = 2*(1-np.cos(x))
+				self.pos[2] = 1/(0.3*np.sqrt(2*np.pi))*np.exp(-x**2/2/0.6**2)+1/(0.3*np.sqrt(2*np.pi))*np.exp(-(x-2*np.pi)**2/2/0.6**2)
+				self.rpy[2] = np.arctan2(2*(1-np.cos(2*np.pi/10000*(i+1)))-2*(1-np.cos(x)),np.sin(2*2*np.pi/10000*(i+1))-np.sin(2*x))
+				if key_press == 'escape':
+					break
+				time.sleep(0.005)
+
+		if key_press == 'm':
+			self.loc_mode = not self.loc_mode
+			self.rpy[1] = 0.0
+			if self.loc_mode:
+				print("local mode")
 			else:
-				self.pos = self.wp[self.wp_index][0:3]
-				self.rpy[2] = self.wp[self.wp_index][3]
+				print("moving mode")
+		
+		if key_press == 'y':
+			if self.auto_mode:
+				self.auto_mode = False
+				print("manual mode")
+			else:
+				self.auto_mode = True
+				print("auto mode")
+
+		if self.loc_mode:
+			if key_press == 'up':
+				self.rpy[1] += self.angle_step/2
+				if self.rpy[1] > np.pi/6:
+					self.rpy[1] = np.pi/6
+				print("pitch angle", self.rpy[1])
+			elif key_press == 'down':
+				self.rpy[1] -= self.angle_step/2
+				if self.rpy[1] < -np.pi/6:
+					self.rpy[1] = -np.pi/6
+				print("pitch angle", self.rpy[1])
 		if key_press == 'escape':
 			self.stop = 1
 			self.start = False
