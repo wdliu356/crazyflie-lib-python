@@ -212,8 +212,8 @@ class Commander():
     #     pk.data = struct.pack('<Bfffff??', TYPE_CUSTOMIZED, float(vx), float(vy), float(vz), float(yawrate), float(yaw), groundmode.value, reset.value)
     #     self._cf.send_packet(pk)
 
-    def send_cus(self,rolld, pitchd, yawd, yawrated, thrustd, start, reset,groundmode):
+    def send_cus(self,rolld, pitchd, yawd, yawrated, thrustd, start, reset, groundmode, force_stop,loc_mode):
         pk = CRTPPacket()
         pk.port = CRTPPort.COMMANDER_GENERIC
-        pk.data = struct.pack('<Bfffff???', TYPE_CUSTOMIZED, float(rolld), float(pitchd), float(yawd), float(yawrated), float(thrustd), start, reset, groundmode)
+        pk.data = struct.pack('<Bfffff?????', TYPE_CUSTOMIZED, float(rolld), float(pitchd), float(yawd), float(yawrated), float(thrustd), start, reset, groundmode, force_stop,loc_mode)
         self._cf.send_packet(pk)

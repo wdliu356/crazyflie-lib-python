@@ -40,6 +40,7 @@ class  SingleCF:
 		self.groundmode = True
 		self.start = False
 		self.reset = False
+		self.force_stop = False
 		self.timest = 0
 		self.vx = 0.0
 		self.vy = 0.0
@@ -75,28 +76,42 @@ class  SingleCF:
 		self.thrust2 = 0
 		self.thrust3 = 0
 		self.thrust4 = 0
+		self.rollreceived = 0
+		self.pitchreceived = 0
+		self.yawreceived = 0
+		self.loc_mode = False
 
 		# self.gain_name = ['vxKp', 'vxKi', 'vyKp', 'vyKi','vzKp','vzKi','zFactor',
 		self.gain_name = [
 					'roll_kp','roll_ki','roll_kd',
 					'pitch_kp','pitch_ki','pitch_kd',
 					'yaw_kp','yaw_ki','yaw_kd',
-					'mass','Ixx','Iyy','Izz','armLength']
+					'Ixx','Iyy','Izz','armLength',
+					'roll_kp_f','roll_ki_f','roll_kd_f',
+					'pitch_kp_f','pitch_ki_f','pitch_kd_f',
+					'yaw_kp_f','yaw_ki_f','yaw_kd_f',]
 		# self.gain_value = [3.5,0.001,3.5,0.001,10,20,0.6,
 		# 			 0.5,-10.0,-225,0.6,10.0,300,
 		# 			 0.04,0.1,2.0,0.0864,2.0011E-06,6.9007E-06,0.0001064235,0.041]
 		# self.gain_value = [3.5,0.1,3.5,0.1,10,20,0.8,
 		
+		# # for small quad
 		# self.gain_value = [
-		# 			 1.2, 0.05, -1500.0,
-		# 			 0.5, 0.0001, -550.0,
+		# 			 1.2*0.041, 0.05*0.041, -1500.0,
+		# 			 0.5*0.041, 0.0001*0.041, -800.0,
 		# 			 0.03, 0.02, -15.0,
 		# 			 0.0864,2.0011E-06,6.9007E-06,0.0001064235,0.041] # tune here
+		# for large quad
 		self.gain_value = [
-					 1.2, 0.05, -1500.0,
-					 0.7, 0.000, -800.0,
-					 0.03, 0.02, -15.0,
-					 0.0754,2.0011E-06,6.9007E-06,0.0001064235,0.041] # tune here
+					 0.4,0.05,-250.0,
+					 0.3,0.01,-200.0,
+					 0.15, 0.03, -10.0,
+					 6.4631E-05,9.9325E-05,0.0025395,0.041,
+					 0.5,0.01,-1000.0,
+					 0.4,0.01,-300.0,
+					 0.4, 0.01, -50.0,] # tune here
+		
+		### Tune pid on z direction
 		print("start setting param")
 		for n in self.gain_name:
 			print(n)
@@ -128,19 +143,19 @@ class  SingleCF:
 		self._lg_state = LogConfig(name='state', period_in_ms=10)
 		self._lg_motor = LogConfig(name='motor', period_in_ms=10)
 		self._lg_stabilizer = LogConfig(name='stabilizer', period_in_ms=10)
-		self._lg_estimate = LogConfig(name='stateEstimate', period_in_ms=10)
-		self._lg_thrust = LogConfig(name='thrust', period_in_ms=10)
+		# self._lg_estimate = LogConfig(name='stateEstimate', period_in_ms=10)
+		# self._lg_thrust = LogConfig(name='thrust', period_in_ms=10)
 		self._lg_stabilizer.add_variable('stabilizer.roll', 'float')
 		self._lg_stabilizer.add_variable('stabilizer.pitch', 'float')
 		self._lg_stabilizer.add_variable('stabilizer.yaw', 'float')
-		self._lg_estimate.add_variable('stabilizer.thrust', 'float')
+		# self._lg_estimate.add_variable('stabilizer.thrust', 'float')
 		self._lg_stabilizer.add_variable('gyro.x', 'float')
 		self._lg_stabilizer.add_variable('gyro.y', 'float')
 		self._lg_stabilizer.add_variable('gyro.z', 'float')
-		self._lg_estimate.add_variable('stateEstimate.vx', 'float')
-		self._lg_estimate.add_variable('stateEstimate.vy', 'float')
-		self._lg_estimate.add_variable('stateEstimate.vz', 'float')
-		self._lg_estimate.add_variable('stabilizer.estimator','uint8_t')
+		# self._lg_estimate.add_variable('stateEstimate.vx', 'float')
+		# self._lg_estimate.add_variable('stateEstimate.vy', 'float')
+		# self._lg_estimate.add_variable('stateEstimate.vz', 'float')
+		# self._lg_estimate.add_variable('stabilizer.estimator','uint8_t')
 		self._lg_state.add_variable('customizedCtl.rollTorque', 'float')
 		self._lg_state.add_variable('customizedCtl.pitchTorque', 'float')
 		self._lg_state.add_variable('customizedCtl.yawTorque', 'float')
@@ -166,10 +181,14 @@ class  SingleCF:
 		# self._lg_estimate.add_variable('motor.m3req', 'int32_t')
 		# self._lg_estimate.add_variable('motor.m4req', 'int32_t')
 
-		self._lg_thrust.add_variable('motor.m1', 'int32_t')
-		self._lg_thrust.add_variable('motor.m2', 'int32_t')
-		self._lg_thrust.add_variable('motor.m3', 'int32_t')
-		self._lg_thrust.add_variable('motor.m4', 'int32_t')
+		# self._lg_thrust.add_variable('motor.m1', 'int32_t')
+		# self._lg_thrust.add_variable('motor.m2', 'int32_t')
+		# self._lg_thrust.add_variable('motor.m3', 'int32_t')
+		# self._lg_thrust.add_variable('motor.m4', 'int32_t')
+
+		# self._lg_supervisor = LogConfig(name='supervisor', period_in_ms=100)
+		# self._lg_supervisor.add_variable('supervisor.info', 'uint16_t')
+
 		
 		
 
@@ -193,15 +212,22 @@ class  SingleCF:
 		self._lg_stabilizer.error_cb.add_callback(self._stab_log_error)
 		self._lg_stabilizer.start()
 
-		self._cf.log.add_config(self._lg_estimate)
-		self._lg_estimate.data_received_cb.add_callback(self._state_estimate_log_data)
-		self._lg_estimate.error_cb.add_callback(self._stab_log_error)
-		self._lg_estimate.start()
+		# self._cf.log.add_config(self._lg_estimate)
+		# self._lg_estimate.data_received_cb.add_callback(self._state_estimate_log_data)
+		# self._lg_estimate.error_cb.add_callback(self._stab_log_error)
+		# self._lg_estimate.start()
 
-		self._cf.log.add_config(self._lg_thrust)
-		self._lg_thrust.data_received_cb.add_callback(self._thrust_log_data)
-		self._lg_thrust.error_cb.add_callback(self._stab_log_error)
-		self._lg_thrust.start()
+		# self._cf.log.add_config(self._lg_thrust)
+		# self._lg_thrust.data_received_cb.add_callback(self._thrust_log_data)
+		# self._lg_thrust.error_cb.add_callback(self._stab_log_error)
+		# self._lg_thrust.start()
+
+		# self._cf.log.add_config(self._lg_supervisor)
+		# self._lg_supervisor.data_received_cb.add_callback(self._supervisor_log_data)
+		# self._lg_supervisor.error_cb.add_callback(self._stab_log_error)
+		# self._lg_supervisor.start()
+
+		
 			
 
 		# except KeyError as e:
@@ -216,6 +242,24 @@ class  SingleCF:
 		self._cf.param.remove_update_callback(self._param_callback)
 
 
+	def _supervisor_log_data(self, timestamp, data, logconf):
+		# print('The supervisor info is %s' % data['supervisor.info'])
+		if data['supervisor.info'] == 1:
+			print('The system can be armed and will accept an arming command')
+		elif data['supervisor.info'] == 2:
+			print('The system is currently armed')
+		elif data['supervisor.info'] == 2+4:
+			print('The system is configured to automatically arm')
+		elif data['supervisor.info'] == 2+4+8:
+			print('The Crazyflie is ready to fly')
+		elif data['supervisor.info'] == 2+4+8+16:
+			print('The Crazyflie is currently flying')
+		elif data['supervisor.info'] == 2+4+8+16+32:
+			print('The crazyflie is up side down/tumbling')
+		elif data['supervisor.info'] == 2+4+8+16+32+64:
+			print('The Crazyflie is locked and must be restarted')
+
+
 	def _thrust_log_data(self, timestamp, data, logconf):
 		self.thrust1 = data["motor.m1"]
 		self.thrust2 = data["motor.m2"]
@@ -224,10 +268,10 @@ class  SingleCF:
 
 	def _battery_log_data(self, timestamp, data, logconf):
 		battery_data = round(data['pm.vbat'], 1)
-		if battery_data < 3.7:
-			print('Battery voltage of |CF %s| is: |3.1V(E)| --- %s V --- |4.2V(F)|' % (self.index, battery_data))
+		# if battery_data < 3.7:
+		# 	print('Battery voltage of |CF %s| is: |3.1V(E)| --- %s V --- |4.2V(F)|' % (self.index, battery_data))
 		# print('Battery voltage of |CF %s| is: |3.1V(E)| --- %s V --- |4.2V(F)|' % (self.index, battery_data))
-		# self._lg_battery.data_received_cb.remove_callback(self._battery_log_data)
+		self._lg_battery.data_received_cb.remove_callback(self._battery_log_data)
 
 
 	def _stab_log_error(self, logconf, msg):
@@ -239,9 +283,9 @@ class  SingleCF:
 		self.rolltorque = data["customizedCtl.rollTorque"]
 		self.pitchtorque = data["customizedCtl.pitchTorque"]
 		self.yawtorque = data["customizedCtl.yawTorque"]
-		self.rollref = data["customizedCtl.rollD"]
-		self.pitchref = data["customizedCtl.pitchD"]
-		self.yawref = data["customizedCtl.yawD"]
+		self.rollreceived = data["customizedCtl.rollD"]
+		self.pitchreceived = data["customizedCtl.pitchD"]
+		self.yawreceived = data["customizedCtl.yawD"]
 		# print('Thrust of |CF %s| is: %s' % (self.index, self.thrust))
 		# print("mass is %s" % data["customizedCtl.mass"])
 		# print("gravity is %s" % data["customizedCtl.g"])
@@ -263,9 +307,9 @@ class  SingleCF:
 		self.pitch = data["stabilizer.pitch"]/180*np.pi
 		self.yawfb = data["stabilizer.yaw"]/180*np.pi
 		# print('the feedback yaw angle is %s' % self.yawfb)
-		self.rollratefb = data["gyro.x"]/180*np.pi
-		self.pitchratefb = data["gyro.y"]/180*np.pi
-		self.yawratefb = data["gyro.z"]/180*np.pi
+		# self.rollratefb = data["gyro.x"]/180*np.pi
+		# self.pitchratefb = data["gyro.y"]/180*np.pi
+		# self.yawratefb = data["gyro.z"]/180*np.pi
 
 	def _state_estimate_log_data(self, timestamp, data, logconf):
 		# pass
@@ -292,15 +336,26 @@ class  SingleCF:
 
 	def _update_motors(self):
 		# self._cf.commander.send_cus(self.vx,self.vy,self.vz,self.yawrate,self.yaw,self.groundmode,self.reset)
-		self._cf.commander.send_cus(self.rolld,self.pitchd,self.yawd,self.yawrate,self.thrustd,self.start,self.reset,self.groundmode)
+		# print("start",self.start)
+		# if self.groundmode == True:
+		# 	print("ground mode")
+		# else:
+		# 	print("air mode")
+		
+		self._cf.commander.send_cus(self.rolld,self.pitchd,self.yawd,self.yawrate,self.thrustd,self.start,self.reset,self.groundmode,self.force_stop,self.loc_mode)
 
 	def _stop_crazyflie(self):
-		self._cf.commander.send_stop_setpoint()
-		# time.sleep(0.1)
+		self.force_stop = True
+		for i in range(10):
+			self._cf.commander.send_cus(self.rolld,self.pitchd,self.yawd,self.yawrate,self.thrustd,self.start,self.reset,self.groundmode,self.force_stop,self.loc_mode)
+			time.sleep(0.1)
+			self._cf.commander.send_stop_setpoint()
+			time.sleep(0.1)
+		print("stop command sent")
 		self._cf.close_link()
 
 if __name__ == '__main__':
 	uri = 'radio://0/80/2M'
 	cf = SingleCF(uri, 1)
-	# time.sleep(5
+	# time.sleep(5)
 

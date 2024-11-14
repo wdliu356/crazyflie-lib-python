@@ -46,7 +46,7 @@ class CombinedFrame:
 		self.dt = 0
 
 
-	def run(self, stop_shared, att_ref_shared, yaw_rate_shared,reached,start,state_fb_shared,thrust_shared,groundmode):
+	def run(self, stop_shared, att_ref_shared, yaw_rate_shared,reached,start,state_fb_shared,thrust_shared,groundmode,loc_mode):
 
 		# Initialize the low-level drivers (don't list the debug drivers)
 		cflib.crtp.init_drivers(enable_debug_driver=False)
@@ -82,13 +82,14 @@ class CombinedFrame:
 				self.qc.start = start.value
 				# print('in cbframe',self.qc.start.value)
 				self.qc.reset = reached.value
+				self.qc.loc_mode = loc_mode.value
 				self.qc._update_motors()
 				self.dt = self.current_time - self.last_loop_time
 				self.last_loop_time = self.current_time
 				self.log.append(self.dt)
 
-				state_fb_shared[:] = [self.qc.vxfb, self.qc.vyfb, self.qc.vzfb, self.qc.rollratefb, self.qc.pitchratefb, self.qc.yawratefb, self.qc.roll, self.qc.pitch, self.qc.yawfb, self.qc.thrust,self.qc.rollref,
-						  self.qc.pitchref,self.qc.yawref,self.qc.rolltorque,self.qc.pitchtorque,self.qc.yawtorque,self.qc.m1,self.qc.m2,self.qc.m3,self.qc.m4,self.qc.u1,self.qc.u2,self.qc.u3,self.qc.u4,
+				state_fb_shared[:] = [self.qc.vxfb, self.qc.vyfb, self.qc.vzfb, self.qc.rollratefb, self.qc.pitchratefb, self.qc.yawratefb, self.qc.roll, self.qc.pitch, self.qc.yawfb, self.qc.thrust,self.qc.rollreceived,
+						  self.qc.pitchreceived,self.qc.yawreceived,self.qc.rolltorque,self.qc.pitchtorque,self.qc.yawtorque,self.qc.m1,self.qc.m2,self.qc.m3,self.qc.m4,self.qc.u1,self.qc.u2,self.qc.u3,self.qc.u4,
 						  self.qc.m1req,self.qc.m2req,self.qc.m3req,self.qc.m4req,self.qc.thrust1,self.qc.thrust2,self.qc.thrust3,self.qc.thrust4]
 			else:
 				time.sleep(0.001)
@@ -118,7 +119,8 @@ class Controller:
 		self.groundmode = True
 		self.g = 9.81
 		self.z_factor = 0.7
-		self.m = 0.083
+		# self.m = 0.083 #for small
+		self.m = 0.415 #for big
 		self.roll_factor = 1.0
 		self.pitch_factor = 1.0
 		self.num = 0
@@ -127,15 +129,17 @@ class Controller:
 	def acc_control(self, pos_ref_shared, pos_fb_shared, vel_fb_shared,  vel_ref_shared, reached, acc_ref_shared,att_ref_shared,att_fb,auto_mode,groundmode):
 		# acc_ref_shared[:] = self.pKd*(np.array(vel_ref_shared) - np.array(vel_fb_shared))
 		if auto_mode.value:
-			if pos_fb_shared[2] > 0.1 or pos_ref_shared[2] > 0.1:
+			if pos_fb_shared[2] > 0.02 or pos_ref_shared[2] > 0.02:
 				if self.groundmode:
 					self.groundmode = False
+					groundmode.value = False
 					print('airmode')
 					self.perr = np.array([0.0,0.0,0.0])
 					self.verr = np.array([0.0,0.0,0.0])
 			else:
 				if not self.groundmode:
 					self.groundmode = True
+					groundmode.value = True
 					print('groundmode')
 					self.perr = np.array([0.0,0.0,0.0])
 					self.verr = np.array([0.0,0.0,0.0])
@@ -147,43 +151,47 @@ class Controller:
 				print('airmode')
 		if self.mode == 0: #tune here
 			if self.groundmode:
-				self.pKp = np.array([5.5,-5.5,0])
-				self.pKi = np.array([0.4,-0.4,0])
-				self.pKd = np.array([3.75,3.75,0])
-
+				self.pKp = np.array([8.0,-8.0,0])
+				self.pKi = np.array([1.2,-1.2,0])
+				self.pKd = np.array([6.0,6.0,0])
+				# self.pKp = np.array([7.0,-7.0,-0.0])
+				# self.pKi = np.array([1.2,-1.2,-0.0])
+				# self.pKd = np.array([5.0,5.0,0.0])
 				# self.pKp = np.array([6.0,-6.0,-15.0])
 				# self.pKi = np.array([0.2,-0.2,-2.5])
 				# self.pKd = np.array([4.0,4.0,3.0])
 			else:
+				# for small
 				# self.pKp = np.array([3.5,-3.5,-10.0])
-				# self.pKi = np.array([0.3,-0.3,-6.5])
-				# self.pKd = np.array([4.5,4.5,5.0])
+				# self.pKi = np.array([0.35,-0.35,-3.5])
+				# self.pKd = np.array([6.0,6.0,30.0])
 
-				self.pKp = np.array([3.5,-3.5,-10.0])
-				self.pKi = np.array([0.35,-0.35,-3.5])
-				self.pKd = np.array([6.0,6.0,30.0])
+				# for big
+				self.pKp = np.array([10.0,-10.0,-80.0])
+				self.pKi = np.array([1.5,-1.5,-60.0])
+				self.pKd = np.array([5.0,5.0,30.0])
 			self.perr += (np.array(pos_ref_shared) - np.array(pos_fb_shared)) * self.dt
-			for i in range(3):
-				if abs(self.perr[i]) > 1:
-					self.perr[i] = 1*np.sign(self.perr[i])
+			# for i in range(3):
+			# 	if abs(self.perr[i]) > 1:
+			# 		self.perr[i] = 1*np.sign(self.perr[i])
 			acc_ref_shared[:] = self.pKp * (np.array(pos_ref_shared) - np.array(pos_fb_shared)) + self.pKi * self.perr + self.pKd*(np.array(vel_ref_shared) - np.array(vel_fb_shared))
 			if self.groundmode:
 				
-				if np.sqrt(acc_ref_shared[0]**2+acc_ref_shared[1]**2) < 0.001 and np.abs(att_ref_shared[2]+att_fb[2]) < 0.01:
+				if np.sqrt(acc_ref_shared[0]**2+acc_ref_shared[1]**2) < 0.001 and np.abs(att_ref_shared[2]+att_fb[2]) < 0.05:
 					reached.value = True
 					self.z_factor = 0.4
 				elif np.sqrt(acc_ref_shared[0]**2+acc_ref_shared[1]**2) < 1.5 and np.abs(att_ref_shared[2]+att_fb[2]) < 0.2:
 					reached.value = False
-					x = np.max([(np.sqrt(acc_ref_shared[0]**2+acc_ref_shared[1]**2)-0.001)/1.499,(np.abs(att_ref_shared[2]+att_fb[2])-0.01)/0.19])
+					x = np.max([(np.sqrt(acc_ref_shared[0]**2+acc_ref_shared[1]**2)-0.001)/1.499,(np.abs(att_ref_shared[2]+att_fb[2])-0.05)/0.15])
 					# self.z_factor = 0.4 + 0.5*x
 					# self.z_factor = 0.4 + 0.5*np.log2(1+x) ##seems to be good
 					self.z_factor = 0.4 - 0.5 * x * (x-2)##seems to be the best
-					self.roll_factor = 1.3# for linear
+					self.roll_factor = 1.0# for linear
 					# self.roll_factor = 1.3# for log
 				else:
 					reached.value = False
 					self.z_factor = 0.9
-					self.roll_factor = 1.3# for linear
+					self.roll_factor = 1.0# for linear
 					# self.roll_factor = 1.3# for log
 
 				# print('acc_diff,yaw_diff,z_factor',[np.sqrt(acc_ref_shared[0]**2+acc_ref_shared[1]**2),np.abs(att_ref_shared[2]-att_fb[2]),self.z_factor])
@@ -218,13 +226,24 @@ class Controller:
 				# print('loc_mode')
 				pitch_d = att_ref_shared[1]
 				roll_d = att_ref_shared[0]
-				thrust_d = 0.15*(self.g)/np.cos(roll_d)/np.cos(pitch_d)*self.m
+				thrust_d = 0.05*(self.g)/np.cos(roll_d)/np.cos(pitch_d)*self.m
 		else:
 			pitch_d = np.arctan(-(b*acc_ref_shared[0]+a*acc_ref_shared[1])/(self.g-acc_ref_shared[2]))
+			if pitch_d > np.pi/6:
+				pitch_d = np.pi/6
+			elif pitch_d < -np.pi/6:
+				pitch_d = -np.pi/6
 			roll_d = np.arctan(-np.cos(pitch_d)*(a*acc_ref_shared[0]-b*acc_ref_shared[1])/(self.g-acc_ref_shared[2]))
+			if roll_d > np.pi/6:
+				roll_d = np.pi/6
+			elif roll_d < -np.pi/6:
+				roll_d = -np.pi/6
 			thrust_d = (self.g-acc_ref_shared[2])/np.cos(roll_d)/np.cos(pitch_d)*self.m
-			if thrust_d > 1.5*self.m*self.g:
-				thrust_d = 1.5*self.m*self.g
+			# for small
+			# if thrust_d > 1.5*self.m*self.g:
+			# 	thrust_d = 1.5*self.m*self.g
+			if thrust_d > 4.0*self.m*self.g:
+				thrust_d = 4.0*self.m*self.g
 		thrust_shared.value = thrust_d
 		att_ref_shared[:] = [roll_d, pitch_d, yawd]
 
@@ -276,7 +295,7 @@ class Master:
 		self.auto_mode.value = True
 		self.keyboard = KeyboardControl(mode = 0,ground_mode=True)
 		
-		self.logger = CombinedLogger(folder_name='log_test_0827')
+		self.logger = CombinedLogger(folder_name='log_test_1113_new_modal')
 
 		self.controller = Controller()
 		### something went wrong with the state feedback shared, 0 yaw is always achieved, need to check the state feedback
@@ -284,7 +303,7 @@ class Master:
 												args=(self.pos_ref_shared, self.pos_fb_shared, self.vel_fb_shared,  self.vel_ref_shared, self.att_ref_shared, self.thrust_shared, self.reached, self.stop_shared, self.groundmode, self.mode,self.acc_ref_shared,self.state_fb_shared,self.loc_mode,self.auto_mode))
 		self.cbframe = CombinedFrame()
 		self.p_cbframe = multiprocessing.Process(target=self.cbframe.run, 
-												args=(self.stop_shared, self.att_ref_shared, self.yaw_rate_shared, self.reached, self.start, self.state_fb_shared,self.thrust_shared,self.groundmode))
+												args=(self.stop_shared, self.att_ref_shared, self.yaw_rate_shared, self.reached, self.start, self.state_fb_shared,self.thrust_shared,self.groundmode,self.loc_mode))
 
 		self.op = Vicon()
 		self.init_position = self.op.position
@@ -314,11 +333,12 @@ class Master:
 				self.keyboard.command.update()
 				self.start.value = self.keyboard.start
 				self.mode.value = self.keyboard.mode
-				self.groundmode.value = self.keyboard.ground_mode
 				self.loc_mode.value = self.keyboard.loc_mode
 				self.auto_mode.value = self.keyboard.auto_mode
 				self.stop_shared.value = self.keyboard.stop
 				self.pos_ref_shared[:] = self.keyboard.pos
+				if not self.auto_mode.value:
+					self.groundmode.value = self.keyboard.ground_mode
 				if self.loc_mode.value:
 					self.att_ref_shared[:] = self.keyboard.rpy #update all in local mode
 				else:
@@ -331,7 +351,8 @@ class Master:
 									   self.pos_fb_shared[:], 
 									   self.vel_fb_shared[:], self.state_fb_shared[6:9], self.state_fb_shared[3:6],
 									   self.pos_ref_shared[:],[self.att_ref_shared[0],self.att_ref_shared[1],-self.att_ref_shared[2]],
-									   self.vel_ref_shared[:], self.state_fb_shared[13:16],self.state_fb_shared[16:20],self.state_fb_shared[20:24],self.state_fb_shared[24:28],self.state_fb_shared[28:32],self.thrust_shared.value,self.rpy_vicon,self.acc_ref_shared[:])
+									   self.vel_ref_shared[:], self.state_fb_shared[13:16],self.state_fb_shared[16:20],self.state_fb_shared[20:24],self.state_fb_shared[24:28],self.state_fb_shared[28:32],self.thrust_shared.value,self.rpy_vicon,self.acc_ref_shared[:],
+									   self.state_fb_shared[10:13])
 				self.last_loop_time = current_time
 			else:
 				time.sleep(0.0001)
