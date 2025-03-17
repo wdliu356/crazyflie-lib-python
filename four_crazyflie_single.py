@@ -80,6 +80,17 @@ class  SingleCF:
 		self.pitchreceived = 0
 		self.yawreceived = 0
 		self.loc_mode = False
+		self.torque_mode = False
+		self.torque_shared = 0.0
+		self.rolltorquereceived = 0.0
+		self.frame_roll = 0.0
+		self.yawfb = 0.0
+		self.roll_v = 0.0
+		self.pitch_v = 0.0
+		self.yawfb_v = 0.0
+		self.rollratefb_v = 0.0
+		self.pitchratefb_v = 0.0
+		self.yawratefb_v = 0.0
 
 		# self.gain_name = ['vxKp', 'vxKi', 'vyKp', 'vyKi','vzKp','vzKi','zFactor',
 		self.gain_name = [
@@ -89,27 +100,36 @@ class  SingleCF:
 					'Ixx','Iyy','Izz','armLength',
 					'roll_kp_f','roll_ki_f','roll_kd_f',
 					'pitch_kp_f','pitch_ki_f','pitch_kd_f',
-					'yaw_kp_f','yaw_ki_f','yaw_kd_f',]
+					'yaw_kp_f','yaw_ki_f','yaw_kd_f',
+					'spring','Iyy_frame','Izz_frame']
 		# self.gain_value = [3.5,0.001,3.5,0.001,10,20,0.6,
 		# 			 0.5,-10.0,-225,0.6,10.0,300,
 		# 			 0.04,0.1,2.0,0.0864,2.0011E-06,6.9007E-06,0.0001064235,0.041]
 		# self.gain_value = [3.5,0.1,3.5,0.1,10,20,0.8,
 		
-		# # for small quad
-		# self.gain_value = [
-		# 			 1.2*0.041, 0.05*0.041, -1500.0,
-		# 			 0.5*0.041, 0.0001*0.041, -800.0,
-		# 			 0.03, 0.02, -15.0,
-		# 			 0.0864,2.0011E-06,6.9007E-06,0.0001064235,0.041] # tune here
 		# for large quad
 		self.gain_value = [
-					 0.4,0.05,-250.0,
-					 0.3,0.01,-200.0,
-					 0.15, 0.03, -10.0,
-					 6.4631E-05,9.9325E-05,0.0025395,0.041,
-					 0.5,0.01,-1000.0,
-					 0.4,0.01,-300.0,
-					 0.4, 0.01, -50.0,] # tune here
+					 20.0,0.0,10.0,
+					 20.0,0.0,10.0,
+					 20.0,0.0,10.0,
+					 6.3819E-05,9.8489e-05,0.00015404,0.055,
+					 700.0,10.0,80.0,
+					 500.0,10.0,80.0,
+					 15.0,1.0, 5.0,
+					 0.15,8.1398E-06,0.1065**2*0.0801*2+1.3349E-05+0.0002545*2
+		]
+		
+
+		# # for small quad
+		# self.gain_value = [
+		# 			 4000.0,800.0,80.0,
+		# 			 450.0,50.0,120.0,
+		# 			 100.0, 5.0, 30.0,
+		# 			 4.6929E-05,4.7145E-05,9.0062E-05,0.041,
+		# 			 700.0,10.0,80.0,
+		# 			 500.0,10.0,80.0,
+		# 			 15.0,1.0, 5.0,
+		# 			 0.6,1.0428E-06,1.2008E-05+3.5235E-06*2+2*0.07645**2*0.0098]
 		
 		### Tune pid on z direction
 		print("start setting param")
@@ -160,9 +180,14 @@ class  SingleCF:
 		self._lg_state.add_variable('customizedCtl.pitchTorque', 'float')
 		self._lg_state.add_variable('customizedCtl.yawTorque', 'float')
 		
-		self._lg_state.add_variable('customizedCtl.rollD', 'float')
-		self._lg_state.add_variable('customizedCtl.pitchD', 'float')
-		self._lg_state.add_variable('customizedCtl.yawD', 'float')
+		# self._lg_state.add_variable('customizedCtl.rollD', 'float')
+		# self._lg_state.add_variable('customizedCtl.pitchD', 'float')
+		# self._lg_state.add_variable('customizedCtl.yawD', 'float')
+
+		self._lg_state.add_variable('customizedCtl.rollPID','float')
+		self._lg_state.add_variable('customizedCtl.pitchPID','float')
+		self._lg_state.add_variable('customizedCtl.yawPID','float')
+		# self._lg_state.add_variable('customizedCtl.rollTorqueRecieved', 'float')
 		# self._lg_state.add_variable('customizedCtl.mass', 'float')
 		# self._lg_state.add_variable('customizedCtl.g', 'float')
 		# self._lg_state.add_variable('customizedCtl.zFactor', 'float')
@@ -270,7 +295,7 @@ class  SingleCF:
 		battery_data = round(data['pm.vbat'], 1)
 		# if battery_data < 3.7:
 		# 	print('Battery voltage of |CF %s| is: |3.1V(E)| --- %s V --- |4.2V(F)|' % (self.index, battery_data))
-		# print('Battery voltage of |CF %s| is: |3.1V(E)| --- %s V --- |4.2V(F)|' % (self.index, battery_data))
+		print('Battery voltage of |CF %s| is:  %s V ' % (self.index, battery_data))
 		self._lg_battery.data_received_cb.remove_callback(self._battery_log_data)
 
 
@@ -283,9 +308,13 @@ class  SingleCF:
 		self.rolltorque = data["customizedCtl.rollTorque"]
 		self.pitchtorque = data["customizedCtl.pitchTorque"]
 		self.yawtorque = data["customizedCtl.yawTorque"]
-		self.rollreceived = data["customizedCtl.rollD"]
-		self.pitchreceived = data["customizedCtl.pitchD"]
-		self.yawreceived = data["customizedCtl.yawD"]
+		# self.rolltorquereceived = data["customizedCtl.rollD"]
+		# self.pitchreceived = data["customizedCtl.pitchD"]
+		# self.yawreceived = data["customizedCtl.yawD"]
+		self.rollreceived = data["customizedCtl.rollPID"]
+		self.pitchreceived = data["customizedCtl.pitchPID"]
+		self.yawreceived = data["customizedCtl.yawPID"]
+		# self.rolltorquereceived = data["customizedCtl.rollTorqueRecieved"]
 		# print('Thrust of |CF %s| is: %s' % (self.index, self.thrust))
 		# print("mass is %s" % data["customizedCtl.mass"])
 		# print("gravity is %s" % data["customizedCtl.g"])
@@ -304,12 +333,12 @@ class  SingleCF:
 
 	def _stabilizer_log_data(self, timestamp, data, logconf):
 		self.roll = data["stabilizer.roll"]/180*np.pi
-		self.pitch = data["stabilizer.pitch"]/180*np.pi
+		self.pitch = -data["stabilizer.pitch"]/180*np.pi
 		self.yawfb = data["stabilizer.yaw"]/180*np.pi
 		# print('the feedback yaw angle is %s' % self.yawfb)
-		# self.rollratefb = data["gyro.x"]/180*np.pi
-		# self.pitchratefb = data["gyro.y"]/180*np.pi
-		# self.yawratefb = data["gyro.z"]/180*np.pi
+		self.rollratefb = data["gyro.x"]/180*np.pi
+		self.pitchratefb = data["gyro.y"]/180*np.pi
+		self.yawratefb = data["gyro.z"]/180*np.pi
 
 	def _state_estimate_log_data(self, timestamp, data, logconf):
 		# pass
@@ -341,13 +370,22 @@ class  SingleCF:
 		# 	print("ground mode")
 		# else:
 		# 	print("air mode")
+		# print("reset",self.reset)
 		
-		self._cf.commander.send_cus(self.rolld,self.pitchd,self.yawd,self.yawrate,self.thrustd,self.start,self.reset,self.groundmode,self.force_stop,self.loc_mode)
+		self._cf.commander.send_cus(self.rolld,self.pitchd,self.yawd,self.thrustd,self.start,self.groundmode,self.loc_mode,self.frame_roll,self.yawfb)
+
+
+	def _torque_test(self):
+		self._cf.commander.send_torque(self.torque_shared,self.start,self.force_stop,self.thrustd)
+	
+	def _direction_test(self):
+		self._cf.commander.send_test(self.roll_v,self.pitch_v,self.yawfb_v,self.rollratefb_v,self.pitchratefb_v,self.yawratefb_v,self.start)
+
 
 	def _stop_crazyflie(self):
 		self.force_stop = True
 		for i in range(10):
-			self._cf.commander.send_cus(self.rolld,self.pitchd,self.yawd,self.yawrate,self.thrustd,self.start,self.reset,self.groundmode,self.force_stop,self.loc_mode)
+			self._cf.commander.send_cus(self.rolld,self.pitchd,self.yawd,self.thrustd,self.start,self.groundmode,self.loc_mode,self.frame_roll,self.yawfb)
 			time.sleep(0.1)
 			self._cf.commander.send_stop_setpoint()
 			time.sleep(0.1)

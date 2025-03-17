@@ -31,14 +31,17 @@ class KeyboardControl():
 		self.agv = [0.0,0.0,0.0] # angular velocity
 		self.wp_index = 0
 		self.start = True
-		self.angle_step = 0.1
-		self.pos_step = 0.05
+		self.angle_step = np.pi/12
+		self.pos_step = 0.1
 		self.z_step = 0.1
 		self.auto_mode = True
 		self.stop = 0
 		self.landing_overwrite = 0
 		self.ground_mode = ground_mode
 		self.loc_mode = False
+		self.traj_mode = False
+		self.torque_mode = False
+		self.roll_torque = 0.0
 
 	def key_input(self, event):
 		key_press = event.keysym.lower()
@@ -126,22 +129,19 @@ class KeyboardControl():
 				print("change mode to ground mode")
 				self.ground_mode = True
 		if key_press == 'z':### along the trajectory
-			for i in range(10000):
-				x = 2*np.pi/10000*i
-				self.pos[0] = np.sin(2*x)
-				self.pos[1] = 2*(1-np.cos(x))
-				self.pos[2] = 0
-				self.rpy[2] = np.arctan2(2*(1-np.cos(2*np.pi/10000*(i+1)))-2*(1-np.cos(x)),np.sin(2*2*np.pi/10000*(i+1))-np.sin(2*x))
-				if key_press == 'escape':
-					break
-				time.sleep(0.005)
+			self.traj_mode = True
+			print('run ground trajectory, along the trajectory')
+			run = threading.Thread(target=self.run_ground_traj, name='ground_traj')
+			run.start()
 
 		elif key_press == 'x':### constant yaw rate
 			for i in range(10000):
 				x = 2*np.pi/10000*i
-				self.pos[0] = np.sin(2*x)
-				self.pos[1] = 2*(1-np.cos(x))
+				self.pos[0] = 1/2*np.sin(2*x)
+				self.pos[1] = -1*(1-np.cos(x))
 				self.pos[2] = 0
+				self.vel[0] = 1/2*2*np.cos(2*x)
+				self.vel[1] = -1*np.sin(x)
 				self.agv[2] = 0.2
 				if key_press == 'escape':
 					break
@@ -150,9 +150,11 @@ class KeyboardControl():
 		elif key_press == 'c':### constant yaw angle
 			for i in range(10000):
 				x = 2*np.pi/10000*i
-				self.pos[0] = np.sin(2*x)
-				self.pos[1] = 2*(1-np.cos(x))
+				self.pos[0] = 1/2*np.sin(2*x)
+				self.pos[1] = -1*(1-np.cos(x))
 				self.pos[2] = 0
+				self.vel[0] = 1/2*2*np.cos(2*x)
+				self.vel[1] = -1*np.sin(x)
 				self.rpy[2] = 0
 				if key_press == 'escape':
 					break
@@ -161,13 +163,35 @@ class KeyboardControl():
 		elif key_press == 'v':### changing alttitude
 			for i in range(10000):
 				x = 2*np.pi/10000*i
-				self.pos[0] = np.sin(2*x)
-				self.pos[1] = 2*(1-np.cos(x))
+				self.pos[0] = 1/2*np.sin(2*x)
+				self.pos[1] = -1*(1-np.cos(x))
+				self.vel[0] = 1/2*2*np.cos(2*x)
+				self.vel[1] = -1*np.sin(x)
 				self.pos[2] = 1/(0.3*np.sqrt(2*np.pi))*np.exp(-x**2/2/0.6**2)+1/(0.3*np.sqrt(2*np.pi))*np.exp(-(x-2*np.pi)**2/2/0.6**2)
-				self.rpy[2] = np.arctan2(2*(1-np.cos(2*np.pi/10000*(i+1)))-2*(1-np.cos(x)),np.sin(2*2*np.pi/10000*(i+1))-np.sin(2*x))
+				self.rpy[2] = np.arctan2(-1*(1-np.cos(2*np.pi/10000*(i+1)))+1*(1-np.cos(x)),1/2*np.sin(2*2*np.pi/10000*(i+1))-1/2*np.sin(2*x))
 				if key_press == 'escape':
 					break
 				time.sleep(0.005)
+
+		if key_press == "1":
+			self.torque_mode = not self.torque_mode
+			if self.torque_mode:
+				print("torque mode")
+			else:
+				print("normal mode")
+
+		if self.torque_mode:
+			if key_press == 'up':
+				self.roll_torque += 0.01
+				print("roll torque", self.roll_torque)
+			elif key_press == 'down':
+				self.roll_torque -= 0.01
+				print("roll torque", self.roll_torque)
+			if key_press == 'b':
+				print('run torque test')
+				run = threading.Thread(target=self.torque_test, name='torque test')
+				run.start()
+
 
 		if key_press == 'm':
 			self.loc_mode = not self.loc_mode
@@ -196,10 +220,73 @@ class KeyboardControl():
 				if self.rpy[1] < -np.pi/6:
 					self.rpy[1] = -np.pi/6
 				print("pitch angle", self.rpy[1])
+			elif key_press == 'left':
+				self.rpy[0] -= self.angle_step/2
+				if self.rpy[0] < -np.pi/6:
+					self.rpy[0] = -np.pi/6
+				print("roll angle", self.rpy[0])
+			elif key_press == 'right':
+				self.rpy[0] += self.angle_step/2
+				if self.rpy[0] > np.pi/6:
+					self.rpy[0] = np.pi/6
+				print("roll angle", self.rpy[0])
 		if key_press == 'escape':
 			self.stop = 1
 			self.start = False
 			print("x=%s y=%s z=%s" % (self.pos[0], self.pos[1], self.pos[2]))
+	def run_ground_traj(self):
+		for i in range(4000):
+			if self.stop or (not self.start):
+				break
+			x = 2*np.pi/4000*i
+			self.pos[0] = 1/2*np.sin(2*x)
+			self.pos[1] = -1*(1-np.cos(x))
+			self.pos[2] = 0
+			self.vel[0] = 1/2*2*np.cos(2*x)*2*np.pi/4000/0.005
+			self.vel[1] = 1*np.sin(x)*2*np.pi/4000/0.005## In original body frame so a negative sign is added
+			self.rpy[2] = -np.arctan2(-1*(1-np.cos(2*np.pi/4000*(i+1)))+1*(1-np.cos(x)),1/2*np.sin(2*2*np.pi/4000*(i+1))-1/2*np.sin(2*x))# this is also in original body frame
+			time.sleep(0.005)
+		self.vel = [0,0,0]
+		# self.stop = 1
+		# self.start = False
+		print("trajectory finished")
+		self.traj_mode = False
+	
+	def torque_test(self):
+		# for large
+		for i in range(1500):
+			if self.stop or (not self.start):
+				return
+			self.roll_torque += 0.0001
+			time.sleep(0.01)
+		for i in range(3000):
+			if self.stop or (not self.start):
+				return
+			self.roll_torque -= 0.0001
+			time.sleep(0.01)
+		for i in range(1500):
+			if self.stop or (not self.start):
+				return
+			self.roll_torque += 0.0001
+			time.sleep(0.01)
+
+		# # for small
+		# for i in range(500):
+		# 	if self.stop or (not self.start):
+		# 		return
+		# 	self.roll_torque += 0.0001
+		# 	time.sleep(0.01)
+		# for i in range(1000):
+		# 	if self.stop or (not self.start):
+		# 		return
+		# 	self.roll_torque -= 0.0001
+		# 	time.sleep(0.01)
+		# for i in range(500):
+		# 	if self.stop or (not self.start):
+		# 		return
+		# 	self.roll_torque += 0.0001
+		# 	time.sleep(0.01)
+
 
 
 

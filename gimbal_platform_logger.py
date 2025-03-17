@@ -29,15 +29,16 @@ class CombinedLogger:
 							"thrust_ref",
 							"roll_vicon", "pitch_vicon", "yaw_vicon",
 							"acc_x", "acc_y", "acc_z",
-							"roll_received", "pitch_received", "yaw_received",
-							]] # error rotation integration
+							"roll_received", "pitch_received", "yaw_received",]]
+							# "roll_torque"]]
+							 # error rotation integration
 
 	def log_append(self, timestamp, dt, 
 						 pos, vel, rpy, agv, 
 						 pos_ref, rpy_ref, vel_ref,torque,
 						 w,u,mreq,thrust,
 						#  u,w,qfb,
-						 thrust_ref,rpy_vicon,acc,att_received):
+						 thrust_ref,rpy_vicon,acc,att_received):#,roll_torque):
 		"""
 		timestamp = round(timestamp,3)
 		e = round(e,3)
@@ -59,7 +60,8 @@ class CombinedLogger:
 								thrust_ref,
 								rpy_vicon[0],rpy_vicon[1],rpy_vicon[2],
 								acc[0],acc[1],acc[2],
-								att_received[0],att_received[1],att_received[2]])
+								att_received[0],att_received[1],att_received[2],])
+								# roll_torque])
 
 	def conv(self, s):
 		try:
@@ -153,6 +155,7 @@ class CombinedLogger:
 		roll_received = log_memory_array[:,i]; i+=1
 		pitch_received = log_memory_array[:,i]; i+=1
 		yaw_received = log_memory_array[:,i]; i+=1
+		# roll_torque = log_memory_array[:,i]; i+=1
 		# plt.subplot(5,1,1)
 		# plt.plot(timestamp,vel_x,'r',timestamp,x_vel_ref,'r--',timestamp,vel_y,'g',timestamp,y_vel_ref,'g--',timestamp,vel_z, 'b',timestamp,z_vel_ref,'b--')
 		# plt.legend(["x","x_ref","y","y_ref","z","z_ref"])
@@ -170,8 +173,8 @@ class CombinedLogger:
 		plt.legend(["x","x_ref","y","y_ref","z","z_ref"])
 		plt.grid(True)
 		plt.subplot(4,1,2)
-		plt.plot(timestamp,roll,'r',timestamp,roll_ref,'r--',timestamp,roll_received,'r-*',timestamp,pitch,'g',timestamp,pitch_ref,'g--',timestamp,pitch_received,'g-*',timestamp,yaw, 'b',timestamp,yaw_ref,'b--',timestamp,yaw_received,'b-*')#,timestamp,roll_vicon,'r-.',timestamp,pitch_vicon,'g-.',timestamp,yaw_vicon,'b-.')
-		plt.legend(["roll","roll_ref","roll_received","pitch","pitch_ref","pitch_received","yaw","yaw_ref","yaw_received"])#,"roll_vicon","pitch_vicon","yaw_vicon"])
+		plt.plot(timestamp,roll,'r',timestamp,roll_ref,'r--',timestamp,pitch,'g',timestamp,pitch_ref,'g--',timestamp,yaw, 'b',timestamp,yaw_ref,'b--')#,timestamp,roll_vicon,'r-.',timestamp,pitch_vicon,'g-.',timestamp,yaw_vicon,'b-.')
+		plt.legend(["roll","roll_ref","pitch","pitch_ref","yaw","yaw_ref"])#,"roll_vicon","pitch_vicon","yaw_vicon"])
 		plt.ylabel('rpy')
 		plt.grid(True)
 		plt.subplot(4,1,3)
@@ -216,14 +219,39 @@ class CombinedLogger:
 		plt.ylabel('vel')
 		plt.grid(True)
 		plt.subplot(3,1,2)
-		plt.plot(timestamp,agv_x,'r',timestamp,agv_y,'g',timestamp,agv_z, 'b')
-		plt.legend(["x","y","z"])
-		plt.ylabel('agv')
+		plt.plot(timestamp,thrust_ref,'r')
+		plt.legend(["thrust_ref"])
+		plt.ylabel('thrust ref')
 		plt.grid(True)
 		plt.subplot(3,1,3)
 		plt.plot(timestamp,acc_x,'r',timestamp,acc_y,'g',timestamp,acc_z, 'b')
 		plt.legend(["x","y","z"])
 		plt.ylabel('acc')
 		plt.grid(True)
+		# plt.subplot(4,1,4)
+		# plt.plot(roll,roll_torque,'r')
+		# plt.legend(["roll_torque"])
+		# plt.ylabel('roll_torque')
+		# plt.xlabel('roll')
+		# plt.grid(True)
+		plt.figure()
+		plt.plot(timestamp,roll_vicon,'r',timestamp,pitch_vicon,'g',timestamp,yaw_vicon,'b')
+		plt.legend(["roll","pitch","yaw"])
+		plt.xlabel('time')
+		plt.ylabel('frame attitude')
+		plt.grid(True)
+		plt.figure()
+		plt.plot(timestamp,agv_x,'r',timestamp,agv_y,'g',timestamp,agv_z, 'b')
+		plt.legend(["x","y","z"])
+		plt.ylabel('agv')
+		plt.grid(True)
+
+		plt.figure()
+		plt.plot(timestamp,roll_received,'r',timestamp,pitch_received,'g--',timestamp,yaw_received,'b')
+		plt.legend(["rollPID","pitchPID","yawPID"])
+		plt.ylabel('PID')
+		plt.grid(True)
+
+
 		
 		plt.show()

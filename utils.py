@@ -9,7 +9,7 @@ def nparray2bin(a):
     return a.tobytes()
 
 def bin2nparray(b):
-    return np.frombuffer(b, dtype=float).reshape(13)
+    return np.frombuffer(b, dtype=float).reshape(17)
 
 def int2bin(integer):
     return struct.pack(">I", integer)

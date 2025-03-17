@@ -4,8 +4,8 @@ import struct
 import time
 import queue
 import numpy as np
-from test_read_txt import read_txt_file, read_txt_file_2
-from test_write_txt import  write_txt_file
+# from test_read_txt import read_txt_file, read_txt_file_2
+# from test_write_txt import  write_txt_file
 
 from utils import bin2int, bin2nparray
 
@@ -88,13 +88,20 @@ class Vicon(object):
         self.t1 = None
         self.server = TcpServer("192.168.10.12", port=8800)
         # self.server = TcpServer("10.1.120.10", port=8800)
-        self.position = np.zeros(3)
-        self.rotation = np.zeros(4)
-        self.rpy = np.zeros(3)
-        self.position_prev = np.zeros(3)
-        self.rotation_prev = np.zeros(4)
-        self.velocity = np.zeros(3)
-        self.rotation_rate = np.zeros(3)
+        # self.position = np.zeros(3)
+        # self.rotation = np.zeros(4)
+        # self.rpy = np.zeros(3)
+        # self.position_prev = np.zeros(3)
+        # self.rotation_prev = np.zeros(4)
+        # self.velocity = np.zeros(3)
+        # self.rotation_rate = np.zeros(3)
+        self.body_position = np.zeros(3)
+        self.body_rotation = np.zeros(4)
+        self.body_velocity = np.zeros(3)
+        self.body_rotation_rate = np.zeros(3)
+        self.frame_rotation = np.zeros(4)
+        self.frame_position = np.zeros(3)
+        self.frame_velocity = np.zeros(3)
 
         self.t = threading.Thread(target=self.server.launch)
         self.t.start()
@@ -106,11 +113,11 @@ class Vicon(object):
             data = self.server.get()
             # print(data)
             data = bin2nparray(data)
-            self.position = data[0:3]
-            self.velocity = data[3:6]
-
-            self.rpy = data[6:9]
-            self.rotation = data[9:13]
+            self.body_rotation = data[0:4]
+            self.body_rotation_rate = data[4:7]
+            self.frame_rotation = data[7:11]
+            self.frame_position = data[11:14]
+            self.frame_velocity = data[14:17]
             # self.rpy = data[13:]
             current_time = time.time()
             # print(current_time - previous_time)
@@ -126,13 +133,16 @@ if __name__ == "__main__":
     vicon = Vicon()
     while True:
         print("==== pos ====")
-        print(vicon.position)
+        print(vicon.frame_position)
         print("==== quan ====")
-        print(vicon.rotation)
+        print(vicon.body_rotation)
         print("==== vel ====")
-        print(vicon.velocity)
-        print("==== rpy ====")
-        print(vicon.rpy)
+        print(vicon.frame_velocity)
+        print("==== rpy rate ====")
+        print(vicon.body_rotation_rate)
+        print("==== frame rotation ====")
+        print(vicon.frame_rotation)
+        time.sleep(0.5)
 
     #     print("==== angular vel ====")
     #     print(vicon.rotation_rate)

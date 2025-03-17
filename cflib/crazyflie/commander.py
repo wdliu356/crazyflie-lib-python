@@ -44,6 +44,9 @@ TYPE_HOVER = 5
 TYPE_FULL_STATE = 6
 TYPE_POSITION = 7
 TYPE_CUSTOMIZED = 8
+TYPE_TORQUE = 9
+TYPE_TEST = 10
+TYPE_TORQUE_CONTROL = 11
 
 TYPE_META_COMMAND_NOTIFY_SETPOINT_STOP = 0
 
@@ -212,8 +215,26 @@ class Commander():
     #     pk.data = struct.pack('<Bfffff??', TYPE_CUSTOMIZED, float(vx), float(vy), float(vz), float(yawrate), float(yaw), groundmode.value, reset.value)
     #     self._cf.send_packet(pk)
 
-    def send_cus(self,rolld, pitchd, yawd, yawrated, thrustd, start, reset, groundmode, force_stop,loc_mode):
+    def send_cus(self,rolld, pitchd, yawd, thrustd, start, groundmode,loc_mode,frame_roll,yaw_fb):
         pk = CRTPPacket()
         pk.port = CRTPPort.COMMANDER_GENERIC
-        pk.data = struct.pack('<Bfffff?????', TYPE_CUSTOMIZED, float(rolld), float(pitchd), float(yawd), float(yawrated), float(thrustd), start, reset, groundmode, force_stop,loc_mode)
+        pk.data = struct.pack('<Bffff???ff', TYPE_CUSTOMIZED, float(rolld), float(pitchd), float(yawd), float(thrustd), start, groundmode, loc_mode, float(frame_roll),float(yaw_fb))
+        self._cf.send_packet(pk)
+    
+    def send_torque(self,roll_torque,start,force_stop,thrustd):
+        pk = CRTPPacket()
+        pk.port = CRTPPort.COMMANDER_GENERIC
+        pk.data = struct.pack('<Bf??f', TYPE_TORQUE, float(roll_torque), start, force_stop, float(thrustd))
+        self._cf.send_packet(pk)
+
+    def send_test(self,roll,pitch,yaw,rollrate,pitchrate,yawrate,start):
+        pk = CRTPPacket()
+        pk.port = CRTPPort.COMMANDER_GENERIC
+        pk.data = struct.pack('<Bffffff?', TYPE_TEST, roll, pitch, yaw, rollrate, pitchrate, yawrate, start)
+        self._cf.send_packet(pk)
+
+    def send_torque_control(self,roll_torque,pitch_torque,yaw_torque,thrustd,start):
+        pk = CRTPPacket()
+        pk.port = CRTPPort.COMMANDER_GENERIC
+        pk.data = struct.pack('<Bffff?', TYPE_TORQUE_CONTROL, roll_torque, pitch_torque, yaw_torque, thrustd, start)
         self._cf.send_packet(pk)

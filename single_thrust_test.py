@@ -66,8 +66,6 @@ class  SingleCF:
 	def _disconnected(self, link_uri):
 		print('Disconnected from %s' % link_uri)
 
-	def _update_motors(self,rolld,pitchd,yawd,yawrate,thrustd,start,reset):
-		self._cf.commander.send_cus(rolld,pitchd,yawd,yawrate,thrustd,start,reset)
 
 	def _stop_crazyflie(self):
 		self._cf.commander.send_stop_setpoint()
@@ -93,7 +91,7 @@ if __name__ == '__main__':
 		keyboard.command.update()
 		if keyboard.stop == 1:
 			break
-		thrustd = 0.0864*9.81*(1)/10
+		thrustd = 0.0864*9.81*(1)/20
 		# qc._update_motors(0,0,0,0,thrustd,1,0)
 		pwm = int((1+1)*0.1*65535/3)
 		qc._cf.param.set_value('motorPowerSet.m1', str(pwm))
