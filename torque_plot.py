@@ -30,7 +30,7 @@ b = np.mean(roll_torque) - a * np.mean(roll)
 calculated_roll_torque = a * roll + b
 print('a:', a)
 print('b:', b)
-
+plt.figure()
 plt.plot(roll, roll_torque, 'o', label='Measured Roll Torque')
 plt.plot(roll, calculated_roll_torque, label='Calculated Roll Torque')
 plt.xlabel('Roll (rad)')
@@ -38,6 +38,16 @@ plt.ylabel('Roll Torque')
 plt.title('Roll vs Roll Torque')
 plt.grid()
 plt.legend()
+
+plt.figure()
+plt.plot(roll_torque,roll,  'o', label='Measured Roll Torque')
+plt.plot( calculated_roll_torque,roll, label='Calculated Roll Torque')
+plt.xlabel('Roll Torque')
+plt.ylabel('Roll (rad)')
+plt.title('Roll Torque vs Roll')
+plt.grid()
+plt.legend()
+
 plt.show()
 
 
